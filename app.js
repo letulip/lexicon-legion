@@ -7,7 +7,7 @@ import { levelFromXp, xpIntoLevel, xpForNextLevel, rankTitle } from './src/core/
 import { advanceStreak, todayStr } from './src/core/streak.js';
 import { mergeGroups, pickDistractors, pickWordDistractors, shuffle } from './src/core/groups.js';
 
-export const APP_VERSION = '0.1.0';
+export const APP_VERSION = '0.1.1';
 const STORE_KEY = 'lexicon.store';
 const $ = (s) => document.querySelector(s);
 const MODE_NAMES = { pick: 'узнавание', reverse: 'обратное', type: 'письмо', cloze: 'контекст' };
@@ -160,8 +160,7 @@ function answer(ok, given) {
   $('#fb-ex').innerHTML = ex; $('#fb-ex').classList.toggle('hidden', !ex);
   $('#q-feedback').classList.remove('hidden');
   speak(word.w);
-  if (ok && mode === 'pick') setTimeout(() => { if (locked && cur === queue[qi]) next(); }, 1100);
-  else setTimeout(() => $('#btn-next').focus(), 30);
+  setTimeout(() => $('#btn-next').focus(), 30);   // no auto-advance: the card stays until «Дальше» / Enter
 }
 function next() { qi++; question(); }
 function endSession() {
