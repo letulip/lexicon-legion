@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="0" fill="#0f1220"/>
+  <path d="M256 60 L420 110 V270 C420 360 340 420 256 452 C172 420 92 360 92 270 V110 Z" fill="#1d2238" stroke="#f2b63c" stroke-width="18" stroke-linejoin="round"/>
+  <path d="M256 110 L380 148 V268 C380 334 322 382 256 408 C190 382 132 334 132 268 V148 Z" fill="none" stroke="#5aa9ff" stroke-width="8" opacity=".6"/>
+  <text x="256" y="318" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="190" font-weight="700" fill="#f2b63c">LL</text>
+</svg>

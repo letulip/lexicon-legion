@@ -1,0 +1,19 @@
+{
+ "version": 1,
+ "groups": [
+  {
+   "id": "cestus-d",
+   "title": "Cestus Deception · продвинутые",
+   "description": "Слова полосы Zipf 3.0–3.5 из романа: читатель знает их через одно. Первая порция, 400+ слов; группа растёт.",
+   "count": 405,
+   "level": "продвинутые",
+   "zipf": [
+    3.0,
+    3.5
+   ],
+   "source": "The Cestus Deception",
+   "file": "data/groups/cestus-d.json",
+   "version": 1
+  }
+ ]
+}
