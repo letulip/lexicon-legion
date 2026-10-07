@@ -14,6 +14,20 @@
    "source": "The Cestus Deception",
    "file": "data/groups/cestus-d.json",
    "version": 1
+  },
+  {
+   "id": "common-d",
+   "title": "Общий словарь · продвинутые",
+   "description": "Слова той же полосы Zipf 3.0–3.5 из общего частотного списка английского, которых нет в книге: описательная лексика художественной прозы и разговора.",
+   "count": 654,
+   "level": "продвинутые",
+   "zipf": [
+    3.0,
+    3.5
+   ],
+   "source": "Общий английский (частотный список)",
+   "file": "data/groups/common-d.json",
+   "version": 1
   }
  ]
 }

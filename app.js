@@ -7,7 +7,7 @@ import { levelFromXp, xpIntoLevel, xpForNextLevel, rankTitle } from './src/core/
 import { advanceStreak, todayStr } from './src/core/streak.js';
 import { mergeGroups, pickDistractors, pickWordDistractors, shuffle } from './src/core/groups.js';
 
-export const APP_VERSION = '0.1.1';
+export const APP_VERSION = '0.2.0';
 const STORE_KEY = 'lexicon.store';
 const $ = (s) => document.querySelector(s);
 const MODE_NAMES = { pick: 'узнавание', reverse: 'обратное', type: 'письмо', cloze: 'контекст' };

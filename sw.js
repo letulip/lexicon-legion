@@ -1,9 +1,9 @@
 /* Lexicon Legion service worker — offline app shell.
    Bump CACHE on every release so updated files reach the device. Never touches localStorage. */
-const CACHE = 'lexicon-legion-v0.1.1';
+const CACHE = 'lexicon-legion-v0.2.0';
 const ASSETS = [
   './', './index.html', './dist/style.min.css', './dist/app.min.js', './manifest.json',
-  './data/catalog.json', './data/groups/cestus-d.json',
+  './data/catalog.json', './data/groups/cestus-d.json', './data/groups/common-d.json',
   './icons/logo.svg', './icons/favicon-32.png', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png',
   './assess/', './assess/index.html', './assess/style.css', './assess/app.js', './assess/words.js',
 ];
