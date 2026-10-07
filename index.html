@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1220" />
+  <meta name="color-scheme" content="dark light" />
+  <title>Lexicon Legion</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icons/logo.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="dist/style.min.css" />
+</head>
+<body>
+<div id="app" class="app">
+
+  <!-- HOME -->
+  <section class="screen" id="screen-home">
+    <header class="topbar">
+      <div class="brand"><img class="brand-logo" src="icons/logo.svg" alt="" /><span>Lexicon Legion</span></div>
+      <button class="icon-btn" data-go="settings" title="Настройки">⚙️</button>
+    </header>
+    <div class="stat-row">
+      <div class="chip"><span class="chip-ico">🔥</span><b id="home-streak">0</b><small>дней</small></div>
+      <div class="chip"><span class="chip-ico">🏛</span><b id="home-level">1</b><small id="home-rank">Рекрут</small></div>
+      <div class="chip"><span class="chip-ico">🛡</span><b id="home-learned">0</b><small>в строю</small></div>
+    </div>
+    <div class="xpbar-wrap"><div class="xpbar"><div class="xpbar-fill" id="home-xpfill"></div></div>
+      <div class="xpbar-label"><span id="home-xptext">0 XP</span><span id="home-xpnext"></span></div></div>
+    <div class="card today">
+      <div class="today-grid">
+        <div><b id="t-due">0</b><small>к повторению</small></div>
+        <div><b id="t-learning">0</b><small>в работе</small></div>
+        <div><b id="t-new">0</b><small>новых сегодня</small></div>
+      </div>
+      <button class="btn primary big" id="btn-fight">⚔ В бой</button>
+      <p class="muted small" id="t-hint"></p>
+    </div>
+    <h2 class="h2">Легионы <span class="muted small" id="groups-sub"></span></h2>
+    <div id="groups" class="groups"></div>
+    <p class="foot">Хотите узнать свой уровень? <a href="assess/" class="link">Разведка словаря</a> — тест из 302 слов.</p>
+    <p class="foot" id="version-line"></p>
+  </section>
+
+  <!-- SESSION -->
+  <section class="screen hidden" id="screen-session">
+    <header class="bar">
+      <button class="link" id="btn-exit">← выйти</button>
+      <div class="progress"><div id="s-prog" class="progress-fill"></div></div>
+      <span id="s-counter" class="counter">1 / 20</span>
+    </header>
+    <div class="card qcard">
+      <div class="mode-tag" id="q-mode">узнавание</div>
+      <div id="q-prompt" class="q-prompt"></div>
+      <div id="q-options" class="options"></div>
+      <form id="q-form" class="q-form hidden" autocomplete="off">
+        <input id="q-input" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="введите слово" />
+        <div class="row"><button type="submit" class="btn primary">Проверить</button><button type="button" class="btn" id="btn-hint">Подсказка</button></div>
+      </form>
+      <button id="btn-dk" class="btn dk">Не знаю</button>
+      <div id="q-feedback" class="feedback hidden">
+        <div class="fb-head"><span id="fb-verdict"></span><span id="fb-srs" class="muted small"></span></div>
+        <div class="fb-word"><b id="fb-word"></b> <i id="fb-pos" class="muted"></i> <button class="icon-btn" id="btn-speak" title="Озвучить">🔊</button></div>
+        <div id="fb-ru" class="fb-ru"></div>
+        <p id="fb-ex" class="ctx"></p>
+        <button id="btn-next" class="btn primary wide">Дальше →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section class="screen hidden" id="screen-results">
+    <h1 class="h1">Бой окончен</h1>
+    <div class="card">
+      <div class="today-grid">
+        <div><b id="r-correct">0</b><small>верно</small></div>
+        <div><b id="r-xp">0</b><small>XP</small></div>
+        <div><b id="r-new">0</b><small>новых слов</small></div>
+      </div>
+      <p id="r-note" class="muted"></p>
+      <div id="r-missed" class="missed"></div>
+      <div class="row">
+        <button class="btn primary" id="btn-again">Ещё бой</button>
+        <button class="btn" data-go="home">Домой</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="screen hidden" id="screen-settings">
+    <header class="bar"><button class="link" data-go="home">← домой</button><span class="counter">Настройки</span></header>
+    <div class="card settings">
+      <label>Новых слов в день <select id="set-dailyNew"><option>5</option><option>10</option><option>15</option><option>20</option><option>30</option></select></label>
+      <label>Карточек в бою <select id="set-sessionSize"><option>10</option><option>20</option><option>30</option></select></label>
+      <label>Акцент <select id="set-accent"><option value="en-US">en-US</option><option value="en-GB">en-GB</option></select></label>
+      <label>Голос <select id="set-voice"><option value="">системный</option></select></label>
+      <label>Скорость речи <input id="set-rate" type="range" min="0.6" max="1.3" step="0.1" /></label>
+      <label class="chk"><input type="checkbox" id="set-sound" /> Озвучивать ответ</label>
+      <label>Тема <select id="set-dark"><option value="auto">как в системе</option><option value="dark">тёмная</option><option value="light">светлая</option></select></label>
+    </div>
+    <h2 class="h2">Данные</h2>
+    <div class="card settings">
+      <div class="row">
+        <button class="btn" id="btn-export">Экспорт прогресса</button>
+        <label class="btn file">Импорт прогресса <input type="file" id="file-import" accept="application/json" hidden /></label>
+      </div>
+      <div class="row">
+        <label class="btn file">Импорт разведки (JSON теста) <input type="file" id="file-assess" accept="application/json" hidden /></label>
+      </div>
+      <p class="muted small">Разведка: слова теста, которые вы не знали, встанут первыми в очередь; известные — сразу в расписание повторений.</p>
+      <button class="btn danger" id="btn-reset">Сбросить весь прогресс</button>
+    </div>
+    <p class="foot" id="settings-version"></p>
+  </section>
+</div>
+<script type="module" src="dist/app.min.js"></script>
+</body>
+</html>

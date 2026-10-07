@@ -1,0 +1,27 @@
+.qcard{min-height:420px}
+.mode-tag{display:inline-block;font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:2px 8px;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+.q-prompt{margin-bottom:12px}
+.q-word{font-size:38px;font-weight:700;letter-spacing:.3px;line-height:1.1}
+.q-pos{color:var(--muted);font-style:italic;margin-left:8px;font-size:16px}
+.q-ru{font-size:22px;line-height:1.35}
+.q-ru li{margin:2px 0}
+.q-cloze{background:var(--bg2);border-left:3px solid var(--accent2);padding:10px 12px;border-radius:8px;font-style:italic;color:var(--muted);margin-top:10px}
+.q-cloze b{color:var(--accent);font-style:normal;letter-spacing:2px}
+.options{display:grid;gap:10px}
+.opt{text-align:left;border:1px solid var(--line);background:var(--bg2);color:var(--fg);border-radius:12px;padding:13px 14px;font-size:17px;cursor:pointer}
+.opt.ok{border-color:var(--ok);background:rgba(63,207,142,.12)} .opt.bad{border-color:var(--bad);background:rgba(255,107,107,.12)}
+.opt:disabled{cursor:default;opacity:.85}
+.q-form input{width:100%;font-size:22px;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--bg2);color:var(--fg);outline:none}
+.q-form input:focus{border-color:var(--accent2)}
+.q-form input.ok{border-color:var(--ok)} .q-form input.bad{border-color:var(--bad)}
+.feedback{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+.fb-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
+.fb-head .ok{color:var(--ok);font-weight:600} .fb-head .bad{color:var(--bad);font-weight:600}
+.fb-word{font-size:26px;margin-bottom:4px}
+.fb-ru{font-size:17px;margin-bottom:8px}
+.fb-ru li{margin:2px 0}
+.ctx{background:var(--bg2);border-left:3px solid var(--accent2);padding:10px 12px;border-radius:8px;color:var(--muted);font-style:italic;margin:0 0 12px}
+.ctx mark{background:transparent;color:var(--fg);font-weight:700;font-style:normal}
+.missed{display:grid;gap:6px;margin:10px 0}
+.missed div{display:flex;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px dashed var(--line)}
+.missed b{min-width:130px} .missed span{color:var(--muted)}

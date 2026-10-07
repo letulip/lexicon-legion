@@ -1,0 +1,26 @@
+:root{--bg:#0f1220;--bg2:#171b2e;--card:#1d2238;--line:#2c3352;--fg:#e8ebf7;--muted:#98a0c3;--accent:#f2b63c;--accent2:#5aa9ff;--ok:#3fcf8e;--bad:#ff6b6b;--dk:#8a93b8;--r:14px}
+:root[data-theme="light"]{--bg:#f5f6fb;--bg2:#eceef7;--card:#fff;--line:#d9ddef;--fg:#1a1e33;--muted:#5d6584;--accent:#b97d05;--accent2:#1f6fd1;--dk:#6a7190}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#f5f6fb;--bg2:#eceef7;--card:#fff;--line:#d9ddef;--fg:#1a1e33;--muted:#5d6584;--accent:#b97d05;--accent2:#1f6fd1;--dk:#6a7190}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 -apple-system,Segoe UI,Roboto,Inter,sans-serif;-webkit-text-size-adjust:100%}
+.app{max-width:640px;margin:0 auto;padding:12px 16px 48px;padding-top:max(12px,env(safe-area-inset-top))}
+.hidden{display:none!important}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:14px}
+.btn{appearance:none;border:1px solid var(--line);background:var(--bg2);color:var(--fg);border-radius:12px;padding:12px 18px;font-size:16px;cursor:pointer;transition:transform .05s}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#1a1300;font-weight:600}
+.btn.big{width:100%;font-size:20px;padding:16px}
+.btn.wide{width:100%}
+.btn.dk{width:100%;margin-top:10px;color:var(--dk)}
+.btn.danger{color:var(--bad)}
+.btn.file{display:inline-block}
+.icon-btn{appearance:none;border:0;background:none;font-size:20px;cursor:pointer;padding:4px}
+.link{appearance:none;border:0;background:none;color:var(--accent2);cursor:pointer;font-size:15px;padding:4px 0;text-decoration:none}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.muted{color:var(--muted)} .small{font-size:13px}
+.foot{color:var(--muted);font-size:13px;margin-top:14px}
+.h1{font-size:26px;margin:14px 0 10px} .h2{font-size:17px;margin:18px 0 8px}
+.bar{display:flex;align-items:center;gap:12px;margin:6px 0 14px}
+.progress{flex:1;height:6px;background:var(--bg2);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;width:0;background:var(--accent);transition:width .25s}
+.counter{color:var(--muted);font-variant-numeric:tabular-nums;font-size:14px}

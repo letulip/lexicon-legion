@@ -2,3 +2,7 @@ node_modules/
 .DS_Store
 *.log
 /tmp/
+
+# Book-derived intermediates: full lemma tables with example sentences and band candidate lists stay local.
+data/sources/*/lemmas.json
+data/sources/*/band-*.tsv

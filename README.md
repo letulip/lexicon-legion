@@ -6,6 +6,20 @@ Offline-first PWA для повторения и изучения незнако
 
 ## Статус
 
+**Волна 1 — приложение.** Дом → бой из 20 карточек (узнавание, обратное, письмо, контекст) → итоги;
+SRS с одной формой на слово, дневной бюджет новых, серия дней, XP; озвучка en-US; экспорт/импорт
+прогресса; импорт результата разведки. Первый легион — `cestus-d` (405 слов полосы Zipf 3.0–3.5).
+
+```bash
+npm install        # только esbuild, для сборки dist/
+npm test           # node --test, чистая логика src/core
+npm run build      # src/css + app.js → dist/ (коммитится, GitHub Pages отдаёт как есть)
+python3 -m http.server 8124   # http://localhost:8124
+```
+
+Как добавить группу слов (без кода): `tools/book2lemmas.py` → `tools/pick.py` → глоссы в TSV →
+`tools/make_group.py` → файл в `data/groups/` + запись в `data/catalog.json` + путь в `sw.js`.
+
 **Фаза 0 — разведка словаря.** Сделано:
 
 - `assess/` — тест из 302 слов, составленный по книге *The Cestus Deception* (Star Wars, 2004).
