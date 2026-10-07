@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>Lexicon Legion · Разведка словаря</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="app" class="app">
+  <!-- intro -->
+  <section id="scr-intro" class="screen">
+    <h1 class="logo"><span class="logo-mark">⚔</span> Lexicon Legion</h1>
+    <p class="sub">Разведка словаря · по книге <i>The Cestus Deception</i></p>
+    <div class="card">
+      <p>302 слова из книги, от самых редких до базовых. На каждое — четыре перевода и кнопка <b>«Не знаю»</b>.</p>
+      <ul class="rules">
+        <li>Не уверены — жмите <b>«Не знаю»</b>. Угадывание портит замер (поправка на угадывание есть, но грубая).</li>
+        <li>Кнопка <b>«Контекст»</b> показывает фразу из книги. Пользуйтесь, если слово «вертится на языке» — это тоже измеряется отдельно.</li>
+        <li>Прогресс сохраняется в браузере: можно закрыть и вернуться.</li>
+        <li>Темп — около 20–30 минут. Ответ по первому ощущению точнее долгих раздумий.</li>
+      </ul>
+      <div class="row">
+        <button id="btn-start" class="btn primary">Начать</button>
+        <button id="btn-resume" class="btn hidden">Продолжить <span id="resume-n"></span></button>
+        <button id="btn-results" class="btn ghost hidden">Результаты</button>
+      </div>
+    </div>
+    <p class="foot" id="intro-stats"></p>
+  </section>
+
+  <!-- test -->
+  <section id="scr-test" class="screen hidden">
+    <header class="bar">
+      <button id="btn-exit" class="link">← выйти</button>
+      <div class="progress"><div id="prog" class="progress-fill"></div></div>
+      <span id="counter" class="counter">1 / 302</span>
+    </header>
+    <div class="card qcard">
+      <div class="word-line"><span id="word" class="word">word</span><span id="pos" class="pos">n</span></div>
+      <button id="btn-ctx" class="link ctx-btn">Контекст из книги</button>
+      <p id="ctx" class="ctx hidden"></p>
+      <div id="options" class="options"></div>
+      <button id="btn-dk" class="btn dk">Не знаю</button>
+      <div id="feedback" class="feedback hidden">
+        <div id="fb-text"></div>
+        <button id="btn-next" class="btn primary">Дальше →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- results -->
+  <section id="scr-results" class="screen hidden">
+    <h1 class="logo small"><span class="logo-mark">⚔</span> Разведка завершена</h1>
+    <div class="card">
+      <div class="kpis">
+        <div class="kpi"><div class="kpi-v" id="k-known">—</div><div class="kpi-l">слов теста знаете<br>(с поправкой на угадывание)</div></div>
+        <div class="kpi"><div class="kpi-v" id="k-unknown-share">—</div><div class="kpi-l">слов в тексте книги<br>будут непонятны</div></div>
+        <div class="kpi"><div class="kpi-v" id="k-vocab">—</div><div class="kpi-l">оценка словарного запаса<br>(грубо, по частотным полосам)</div></div>
+      </div>
+      <p class="note" id="k-ctx-note"></p>
+      <h2>По полосам частотности</h2>
+      <p class="note">Zipf — логарифм частоты слова в английском (wordfreq). 5 = слово встречается 10 раз на миллион, 3 = один раз на 10 миллионов. Доля в книге — сколько слов текста приходится на эту полосу.</p>
+      <div class="tablewrap"><table id="bands"></table></div>
+      <h2>Что учить первым</h2>
+      <p class="note">Полоса, где знание падает ниже ~70 % и доля в книге ещё заметна — там живёт основной словарь для приложения.</p>
+      <p id="verdict" class="verdict"></p>
+      <h2>Незнакомые слова <span id="unk-n" class="muted"></span></h2>
+      <label class="chk"><input type="checkbox" id="chk-ctx"> включить слова, узнанные только по контексту</label>
+      <div id="unknown" class="unknown"></div>
+      <div class="row">
+        <button id="btn-export" class="btn primary">Скачать результат (JSON)</button>
+        <button id="btn-copy" class="btn">Скопировать JSON</button>
+        <button id="btn-restart" class="btn ghost">Пройти заново</button>
+      </div>
+      <p class="foot">JSON — это сырьё для спеки приложения: пришлите файл в чат.</p>
+    </div>
+  </section>
+</main>
+<script src="words.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
