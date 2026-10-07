@@ -1,6 +1,6 @@
 /* Lexicon Legion service worker — offline app shell.
    Bump CACHE on every release so updated files reach the device. Never touches localStorage. */
-const CACHE = 'lexicon-legion-v0.1.0';
+const CACHE = 'lexicon-legion-v0.1.1';
 const ASSETS = [
   './', './index.html', './dist/style.min.css', './dist/app.min.js', './manifest.json',
   './data/catalog.json', './data/groups/cestus-d.json',
