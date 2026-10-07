@@ -115,8 +115,8 @@
     for (const b of BAND_ORDER) unk += (sh[b] || 0) * (1 - st[b].known);
     $('k-unknown-share').textContent = pct(unk) + ` <span class="muted">+ ${pct(sh.names)} имён</span>`;
     $('k-unknown-share').innerHTML = $('k-unknown-share').textContent;
-    // vocabulary size: band lexicon × known rate, plus everything above Zipf 5 (~1 000) assumed known
-    let vocab = 1000;
+    // vocabulary size in word families: band family count × known rate; everything above Zipf 5 assumed known
+    let vocab = META.lexiconSize.core;
     for (const b of BAND_ORDER) vocab += META.lexiconSize[b] * st[b].known;
     $('k-vocab').textContent = '≈ ' + (Math.round(vocab / 500) * 500).toLocaleString('ru');
     $('k-ctx-note').textContent = tot.ctx ? `Контекст открыт и помог в ${tot.ctx} случаях из ${tot.ok} верных — эти слова «на подходе»: узнаёте в тексте, но не в отрыве от него.` : 'Контекст не использовался.';
