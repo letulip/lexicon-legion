@@ -25,3 +25,8 @@
 .missed{display:grid;gap:6px;margin:10px 0}
 .missed div{display:flex;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px dashed var(--line)}
 .missed b{min-width:130px} .missed span{color:var(--muted)}
+
+.mode-line{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.mask{font-family:ui-monospace,Menlo,monospace;font-size:22px;letter-spacing:2px;color:var(--accent);margin-bottom:8px;min-height:28px}
+.intro .q-ru{margin:10px 0}
+.q-form input.hinted{border-color:var(--accent)}

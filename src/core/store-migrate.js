@@ -1,6 +1,6 @@
 // Store shape, defaults and backward-compatible migrations. Pure — no localStorage here.
 // Cardinal rule: a migration never drops the user's data. Tested in test/store-migrate.test.js.
-export const SCHEMA_VERSION = 1;   // bump + add a migration step when the shape changes
+export const SCHEMA_VERSION = 2;   // bump + add a migration step when the shape changes
 
 export function defaultStore() {
   return {
@@ -13,7 +13,7 @@ export function defaultStore() {
       totalAnswers: 0, totalCorrect: 0, history: {},          // date -> answers
       newToday: { date: null, n: 0 },
     },
-    settings: { dailyNew: 10, sessionSize: 20, voiceURI: '', accent: 'en-US', rate: 1, sound: true, dark: 'auto' },
+    settings: { dailyNew: 10, learnBatch: 10, reviewSize: 20, voiceURI: '', accent: 'en-US', rate: 1, sound: true, dark: 'auto' },
     flags: { onboarded: false, assessImported: false },
   };
 }
@@ -35,7 +35,14 @@ export function looksLikeStore(data) {
 }
 
 export function migrate(s) {
-  // Sequential migrations go here: if ((s.schemaVersion || 1) < 2) { ... }
+  // v1 -> v2: one session size becomes reviewSize (review) + learnBatch (new words). Keep the old value.
+  if ((s.schemaVersion || 1) < 2) {
+    s.settings = s.settings || {};
+    if (s.settings.sessionSize && !s.settings.reviewSize) s.settings.reviewSize = s.settings.sessionSize;
+    // v1 assessment import seeded "known" words at level 3 with zero answers; v2 treats zero-answer
+    // progress as "new", so stamp one correct answer to keep them in the review schedule.
+    for (const id in s.progress || {}) { const p = s.progress[id]; if (p && p.lvl >= 3 && !(p.correct + p.wrong)) p.correct = 1; }
+  }
   s = fillDefaults(s, defaultStore());
   s.schemaVersion = SCHEMA_VERSION;
   return s;
