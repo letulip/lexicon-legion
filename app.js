@@ -31,12 +31,12 @@ let catalog = { groups: [] }, groupsData = [], words = [];
 async function loadData() {
   catalog = await (await fetch('data/catalog.json')).json();
   groupsData = await Promise.all(catalog.groups.map(g => fetch(g.file).then(r => r.json())));
-  for (const g of catalog.groups) if (!store.groups[g.id]) store.groups[g.id] = { enabled: true, addedAt: Date.now(), triage: { pos: 0, done: false } };
-  rebuildWords();
+  ensureGroups(); rebuildWords();
   const now = Date.now();
   for (const id in store.progress) decay(store.progress[id], now);
   save();
 }
+function ensureGroups() { for (const g of catalog.groups) if (!store.groups[g.id]) store.groups[g.id] = { enabled: true, addedAt: Date.now(), triage: { pos: 0, done: false } }; }
 function rebuildWords() {
   const enabled = Object.keys(store.groups).filter(id => store.groups[id].enabled);
   words = mergeGroups(groupsData, enabled, store.custom);
@@ -95,7 +95,8 @@ function renderHome() {
 function renderTrouble() {
   const list = troubleList(words, store);
   $('#btn-trouble-start').disabled = !list.length;
-  $('#trouble-list').innerHTML = list.length ? list.map(w => { const p = store.progress[w.id]; return `<div><b>${w.w}</b><span>${w.ru[0]}</span><span class="tag">промахов ${p.wrong} · ур. ${p.lvl}</span></div>`; }).join('') : '<p class="muted">Список пуст.</p>';
+  const ago = (t) => { const d = Math.floor((Date.now() - (t || 0)) / 86400000); return !t ? '' : d === 0 ? 'сегодня' : d === 1 ? 'вчера' : `${d} дн. назад`; };
+  $('#trouble-list').innerHTML = list.length ? list.map(w => { const p = store.progress[w.id]; return `<div><b>${w.w}</b><span>${w.ru[0]}</span><span class="tag">промахов ${p.wrong} · ур. ${p.lvl} · ${ago(p.lastSeen)}</span></div>`; }).join('') : '<p class="muted">Список пуст.</p>';
 }
 
 // ---------- session ----------
@@ -178,15 +179,18 @@ function hintStep() {
   else $('#btn-hint').textContent = `Подсказка (ещё ${left})`;
   $('#q-input').focus();
 }
-function introNext() { stageDone++; qi++; question(); }
+let introLock = 0;
+function introNext() { const t = Date.now(); if (t - introLock < 350) return; introLock = t; stageDone++; qi++; question(); }
 
 function answer(ok, given) {
   if (locked) return; locked = true;
   const { word, mode } = cur, now = Date.now(), hinted = revealed.length > 0;
   const prev = store.progress[word.id] || newProgress(now);
   const fresh = (prev.correct + prev.wrong) === 0;
-  if (fresh) { store.stats.newToday.n++; result.fresh++; }
-  const r = applyAnswer(prev, { ok, mode, now, hinted });
+  if (fresh) { newLeft(); store.stats.newToday.n++; result.fresh++; }   // newLeft() rolls the date first
+  const r = (kind === 'learn' && !ok)
+    ? { p: { ...prev, wrong: prev.wrong + 1, lastSeen: now, due: now }, hint: 'Вернётся в этом же этапе', xp: 0, recall: false }   // learning: a miss repeats, it does not demote
+    : applyAnswer(prev, { ok, mode, now, hinted });
   r.p.src = prev.src || word.groups[0];
   store.progress[word.id] = r.p;
   if (mode === 'trouble' && ok && !hinted) result.fixed++;
@@ -224,11 +228,12 @@ function next() { qi++; question(); }
 function endSession() {
   const sm = summary(words, store);
   $('#r-correct').textContent = `${result.correct} / ${result.total}`; $('#r-xp').textContent = '+' + result.xp;
-  $('#r-new').textContent = kind === 'learn' ? result.fresh : kind === 'trouble' ? result.fixed : sm.due;
+  const reviewLeft = buildReview(words, store, { size: 999 }).length;
+  $('#r-new').textContent = kind === 'learn' ? result.fresh : kind === 'trouble' ? result.fixed : reviewLeft;
   $('#r-new').nextElementSibling.textContent = kind === 'learn' ? 'новых слов' : kind === 'trouble' ? 'исправлено' : 'ещё к повторению';
   $('#r-note').textContent = kind === 'learn' ? `Порция пройдена: слова на уровне «узнаю», дальше — повторения по расписанию. Сегодня осталось новых: ${newLeft()}.`
     : kind === 'trouble' ? (sm.trouble ? `В списке ошибок осталось ${sm.trouble}.` : 'Список ошибок пуст.')
-    : (sm.due ? `Ещё ${sm.due} к повторению.` : 'Повторения на сегодня закрыты.');
+    : (reviewLeft ? `Ещё ${reviewLeft} к повторению (${sm.due} по сроку, ${reviewLeft - sm.due} в работе).` : 'Повторения на сегодня закрыты.');
   $('#r-missed').innerHTML = result.missed.length ? '<p class="muted small">Промахи:</p>' + result.missed.map(w => `<div><b>${w.w}</b><span>${w.ru[0]}</span></div>`).join('') : '';
   const more = kind === 'learn' ? buildLearn(words, store, { count: store.settings.learnBatch, newLeft: newLeft() }).length
     : kind === 'trouble' ? troubleList(words, store).length : buildReview(words, store, { size: 1 }).length;
@@ -276,7 +281,7 @@ function bindSettings() {
     if (!looksLikeStore(data)) return alert('Это не файл прогресса Lexicon Legion.');
     if (!confirm('Заменить текущий прогресс содержимым файла?')) return;
     try { localStorage.setItem(STORE_KEY + '.bak', JSON.stringify(store)); } catch (x) {}
-    store = migrate(data); save(); rebuildWords(); alert('Импортировано.'); go('home');
+    store = migrate(data); ensureGroups(); save(); rebuildWords(); alert('Импортировано.'); go('home');
   });
   $('#file-assess').onchange = (e) => readFile(e.target.files[0], importAssess);
   $('#btn-reset').onclick = () => { if (confirm('Удалить весь прогресс? Сначала сделайте экспорт.')) { try { localStorage.setItem(STORE_KEY + '.bak', JSON.stringify(store)); } catch (x) {} store = defaultStore(); save(); loadData().then(() => go('home')); } };

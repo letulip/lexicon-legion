@@ -39,6 +39,9 @@ export function migrate(s) {
   if ((s.schemaVersion || 1) < 2) {
     s.settings = s.settings || {};
     if (s.settings.sessionSize && !s.settings.reviewSize) s.settings.reviewSize = s.settings.sessionSize;
+    // v1 assessment import seeded "known" words at level 3 with zero answers; v2 treats zero-answer
+    // progress as "new", so stamp one correct answer to keep them in the review schedule.
+    for (const id in s.progress || {}) { const p = s.progress[id]; if (p && p.lvl >= 3 && !(p.correct + p.wrong)) p.correct = 1; }
   }
   s = fillDefaults(s, defaultStore());
   s.schemaVersion = SCHEMA_VERSION;
