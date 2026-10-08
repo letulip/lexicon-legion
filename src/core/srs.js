@@ -15,7 +15,16 @@ export const RANKS = [
   { id: 'veteran', min: 7, title: 'Ветеран' },
   { id: 'legate', min: 10, title: 'Легат' },
 ];
-export const RECALL_MODES = new Set(['type', 'cloze']);
+export const RECALL_MODES = new Set(['type', 'cloze', 'trouble']);
+export const LEARNED_MIN = 6;     // "выучено": ≥ 3 spaced recalls without hints
+// Word status for the home counters. Recognition tops out at 3; recall climbs to 10.
+export function statusOf(p) {
+  if (!p || (p.correct + p.wrong) === 0) return 'new';
+  if (p.lvl < SCHEDULE_GATE) return 'learning';
+  if (p.lvl < LEARNED_MIN) return 'known';
+  if (p.lvl < LVL_MAX) return 'learned';
+  return 'legate';
+}
 
 export function newProgress(now = 0) { return { lvl: 0, due: 0, peak: 0, correct: 0, wrong: 0, lastSeen: now }; }
 
@@ -53,13 +62,22 @@ export function seedLevel(p, lvl, now = Date.now()) {
 }
 
 // Apply one answer. Pure: returns { p (new progress), hint, xp, recall }.
-// mode: 'pick' | 'reverse' (recognition, capped at PICK_CAP) | 'type' | 'cloze' (recall, to LVL_MAX).
-export function applyAnswer(progress, { ok, mode, now = Date.now() }) {
+// mode: 'pick' | 'reverse' (recognition, capped at PICK_CAP) | 'type' | 'cloze' (recall, to LVL_MAX)
+//     | 'trouble' (recall drill: a clean answer lifts the word straight back to the gate).
+// hinted: the answer used letter hints — counts, but the level does not move.
+export function applyAnswer(progress, { ok, mode, now = Date.now(), hinted = false }) {
   const recall = RECALL_MODES.has(mode);
   const p = { ...(progress || newProgress(now)) };
   let hint = '', xp = 0;
   p.lastSeen = now;
-  if (ok) {
+  if (ok && hinted) {
+    p.correct++; xp = 5; p.due = now;
+    hint = 'С подсказкой: засчитано, уровень не растёт';
+  } else if (ok && mode === 'trouble') {
+    p.correct++; xp = 15;
+    if (p.lvl < SCHEDULE_GATE) { p.lvl = SCHEDULE_GATE; p.peak = Math.max(p.peak, p.lvl); hint = 'Исправлено!'; }
+    p.due = now + (INTERVAL_DAYS[p.lvl] || 0) * DAY;
+  } else if (ok) {
     p.correct++;
     xp = recall ? 15 : 10;
     const cap = recall ? LVL_MAX : PICK_CAP;
@@ -74,8 +92,9 @@ export function applyAnswer(progress, { ok, mode, now = Date.now() }) {
       let wait = INTERVAL_DAYS[p.lvl] || 0;
       if (p.lvl < p.peak) wait = Math.ceil(wait / 2);   // relearning below the peak is faster
       p.due = now + wait * DAY;
-      const r = rankOf(p.lvl);
-      if (r.min === p.lvl && p.lvl > 0) hint = `${r.title}!`;
+      if (p.lvl === LEARNED_MIN) hint = 'Выучено!';
+      else if (p.lvl === LVL_MAX) hint = 'Легат!';
+      else if (p.lvl === SCHEDULE_GATE) hint = 'Узнаю — дальше по расписанию';
     }
   } else {
     p.wrong++;

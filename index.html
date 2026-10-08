@@ -24,19 +24,22 @@
     <div class="stat-row">
       <div class="chip"><span class="chip-ico">🔥</span><b id="home-streak">0</b><small>дней</small></div>
       <div class="chip"><span class="chip-ico">🏛</span><b id="home-level">1</b><small id="home-rank">Рекрут</small></div>
-      <div class="chip"><span class="chip-ico">🛡</span><b id="home-learned">0</b><small>в строю</small></div>
+      <div class="chip"><span class="chip-ico">🔔</span><b id="home-due">0</b><small>к повторению</small></div>
     </div>
     <div class="xpbar-wrap"><div class="xpbar"><div class="xpbar-fill" id="home-xpfill"></div></div>
       <div class="xpbar-label"><span id="home-xptext">0 XP</span><span id="home-xpnext"></span></div></div>
-    <div class="card today">
-      <div class="today-grid">
-        <div><b id="t-due">0</b><small>к повторению</small></div>
-        <div><b id="t-learning">0</b><small>в работе</small></div>
-        <div><b id="t-new">0</b><small>новых сегодня</small></div>
-      </div>
-      <button class="btn primary big" id="btn-fight">⚔ В бой</button>
-      <p class="muted small" id="t-hint"></p>
+    <div class="today-grid four">
+      <div><b id="t-new">0</b><small>новых</small></div>
+      <div><b id="t-learning">0</b><small>в работе</small></div>
+      <div><b id="t-known">0</b><small>узнаю</small></div>
+      <div><b id="t-learned">0</b><small>выучено</small></div>
     </div>
+    <div class="modes">
+      <button class="mode-card" id="btn-review"><span class="mc-ico">🔁</span><span class="mc-body"><b>Повторение</b><small id="mc-review"></small></span><span class="mc-go">→</span></button>
+      <button class="mode-card" id="btn-learn"><span class="mc-ico">✨</span><span class="mc-body"><b>Новые слова</b><small id="mc-learn"></small></span><span class="mc-go">→</span></button>
+      <button class="mode-card" id="btn-trouble"><span class="mc-ico">🩹</span><span class="mc-body"><b>Работа над ошибками</b><small id="mc-trouble"></small></span><span class="mc-go">→</span></button>
+    </div>
+    <p class="muted small" id="t-hint"></p>
     <h2 class="h2">Легионы <span class="muted small" id="groups-sub"></span></h2>
     <div id="groups" class="groups"></div>
     <p class="foot">Хотите узнать свой уровень? <a href="assess/" class="link">Разведка словаря</a> — тест из 302 слов.</p>
@@ -51,10 +54,16 @@
       <span id="s-counter" class="counter">1 / 20</span>
     </header>
     <div class="card qcard">
-      <div class="mode-tag" id="q-mode">узнавание</div>
+      <div class="mode-line"><span class="mode-tag" id="q-mode">узнавание</span><span class="muted small" id="q-stage"></span></div>
+      <div id="q-intro" class="intro hidden">
+        <div class="q-word" id="i-word"></div><div class="q-pos" id="i-pos"></div>
+        <ul class="q-ru" id="i-ru"></ul><p class="ctx" id="i-ex"></p>
+        <div class="row"><button class="btn" id="btn-i-speak">🔊 Озвучить</button><button class="btn primary" id="btn-i-next">Дальше →</button></div>
+      </div>
       <div id="q-prompt" class="q-prompt"></div>
       <div id="q-options" class="options"></div>
       <form id="q-form" class="q-form hidden" autocomplete="off">
+        <div class="mask" id="q-mask"></div>
         <input id="q-input" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="введите слово" />
         <div class="row"><button type="submit" class="btn primary">Проверить</button><button type="button" class="btn" id="btn-hint">Подсказка</button></div>
       </form>
@@ -81,9 +90,19 @@
       <p id="r-note" class="muted"></p>
       <div id="r-missed" class="missed"></div>
       <div class="row">
-        <button class="btn primary" id="btn-again">Ещё бой</button>
+        <button class="btn primary" id="btn-again">Ещё заход</button>
         <button class="btn" data-go="home">Домой</button>
       </div>
+    </div>
+  </section>
+
+  <!-- TROUBLE -->
+  <section class="screen hidden" id="screen-trouble">
+    <header class="bar"><button class="link" data-go="home">← домой</button><span class="counter">Работа над ошибками</span></header>
+    <div class="card">
+      <p class="muted small">Слова с промахами, которые ещё не вернулись на уровень «узнаю». Верное письмо без подсказки исправляет слово и убирает его из списка.</p>
+      <button class="btn primary wide" id="btn-trouble-start">Разобрать</button>
+      <div id="trouble-list" class="missed"></div>
     </div>
   </section>
 
@@ -92,7 +111,8 @@
     <header class="bar"><button class="link" data-go="home">← домой</button><span class="counter">Настройки</span></header>
     <div class="card settings">
       <label>Новых слов в день <select id="set-dailyNew"><option>5</option><option>10</option><option>15</option><option>20</option><option>30</option></select></label>
-      <label>Карточек в бою <select id="set-sessionSize"><option>10</option><option>20</option><option>30</option></select></label>
+      <label>Новых слов в порции <select id="set-learnBatch"><option>5</option><option>10</option><option>15</option></select></label>
+      <label>Карточек в повторении <select id="set-reviewSize"><option>10</option><option>20</option><option>30</option></select></label>
       <label>Акцент <select id="set-accent"><option value="en-US">en-US</option><option value="en-GB">en-GB</option></select></label>
       <label>Голос <select id="set-voice"><option value="">системный</option></select></label>
       <label>Скорость речи <input id="set-rate" type="range" min="0.6" max="1.3" step="0.1" /></label>

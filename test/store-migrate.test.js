@@ -17,3 +17,9 @@ test('migrate v1 → current keeps progress and stamps the version', () => {
   const s = migrate(JSON.parse(JSON.stringify(old)));
   assert.equal(s.schemaVersion, SCHEMA_VERSION); assert.deepEqual(s.progress.ledge, old.progress.ledge); assert.equal(s.stats.xp, 20);
 });
+
+test('migrate v1 → v2 carries sessionSize into reviewSize and adds learnBatch', () => {
+  const old = { schemaVersion: 1, progress: {}, stats: { xp: 1 }, settings: { dailyNew: 15, sessionSize: 30 } };
+  const s = migrate(old);
+  assert.equal(s.schemaVersion, SCHEMA_VERSION); assert.equal(s.settings.reviewSize, 30); assert.equal(s.settings.learnBatch, 10); assert.equal(s.settings.dailyNew, 15);
+});

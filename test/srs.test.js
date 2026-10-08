@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DAY, SCHEDULE_GATE, PICK_CAP, LVL_MAX, newProgress, isDue, isReviewDue, graceDays, decay, seedLevel, applyAnswer, rankOf } from '../src/core/srs.js';
+import { DAY, SCHEDULE_GATE, PICK_CAP, LVL_MAX, LEARNED_MIN, newProgress, isDue, isReviewDue, graceDays, decay, seedLevel, applyAnswer, rankOf, statusOf } from '../src/core/srs.js';
 const NOW = 1_700_000_000_000;
 
 test('newProgress starts at zero', () => { assert.deepEqual(newProgress(NOW), { lvl: 0, due: 0, peak: 0, correct: 0, wrong: 0, lastSeen: NOW }); });
@@ -55,3 +55,31 @@ test('seedLevel clamps and schedules', () => {
 });
 
 test('ranks', () => { assert.equal(rankOf(0).id, 'recruit'); assert.equal(rankOf(4).id, 'legionary'); assert.equal(rankOf(10).id, 'legate'); });
+
+test('a hinted correct answer counts but never moves the level', () => {
+  const p = { lvl: 4, due: NOW - 1, peak: 4, correct: 4, wrong: 0, lastSeen: 0 };
+  const r = applyAnswer(p, { ok: true, mode: 'type', now: NOW, hinted: true });
+  assert.equal(r.p.lvl, 4); assert.equal(r.p.correct, 5); assert.equal(r.xp, 5); assert.equal(r.p.due, NOW);
+});
+
+test('trouble drill: a clean answer lifts the word straight to the gate; a miss keeps it down', () => {
+  const r = applyAnswer({ lvl: 0, due: 0, peak: 2, correct: 1, wrong: 3, lastSeen: 0 }, { ok: true, mode: 'trouble', now: NOW });
+  assert.equal(r.p.lvl, SCHEDULE_GATE); assert.match(r.hint, /Исправлено/);
+  const m = applyAnswer({ lvl: 1, due: 0, peak: 2, correct: 1, wrong: 3, lastSeen: 0 }, { ok: false, mode: 'trouble', now: NOW });
+  assert.equal(m.p.lvl, 0); assert.equal(m.p.wrong, 4);
+});
+
+test('statuses: learned needs LEARNED_MIN, reached only through spaced recalls', () => {
+  assert.equal(statusOf(undefined), 'new');
+  assert.equal(statusOf({ lvl: 0, correct: 0, wrong: 0 }), 'new');       // seeded, unanswered
+  assert.equal(statusOf({ lvl: 2, correct: 2, wrong: 0 }), 'learning');
+  assert.equal(statusOf({ lvl: 3, correct: 3, wrong: 0 }), 'known');
+  assert.equal(statusOf({ lvl: LEARNED_MIN, correct: 6, wrong: 0 }), 'learned');
+  assert.equal(statusOf({ lvl: 10, correct: 12, wrong: 0 }), 'legate');
+  // three recalls at the scheduled dates take a word from 3 to 6; recognition cannot
+  let p = { lvl: 3, due: NOW, peak: 3, correct: 3, wrong: 0, lastSeen: 0 }, t = NOW;
+  for (let i = 0; i < 3; i++) { const r = applyAnswer(p, { ok: true, mode: 'type', now: t }); p = r.p; t = p.due; }
+  assert.equal(p.lvl, LEARNED_MIN); assert.equal(statusOf(p), 'learned');
+  const q = applyAnswer({ lvl: 3, due: NOW - 1, peak: 3, correct: 3, wrong: 0, lastSeen: 0 }, { ok: true, mode: 'pick', now: NOW });
+  assert.equal(q.p.lvl, 3);
+});
