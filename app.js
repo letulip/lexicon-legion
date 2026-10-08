@@ -3,7 +3,7 @@ import { SCHEMA_VERSION, defaultStore, migrate, looksLikeStore } from './src/cor
 import { applyAnswer, newProgress, decay, seedLevel, rankOf, SCHEDULE_GATE } from './src/core/srs.js';
 import { buildReview, buildLearn, troubleList, summary, dueCount } from './src/core/selection.js';
 import { checkAnswer } from './src/core/matching.js';
-import { revealMore, mask, HINT_STEPS } from './src/core/hints.js';
+import { revealMore, mask, hintsLeft } from './src/core/hints.js';
 import { levelFromXp, xpIntoLevel, xpForNextLevel, rankTitle } from './src/core/leveling.js';
 import { advanceStreak, todayStr } from './src/core/streak.js';
 import { mergeGroups, pickDistractors, pickWordDistractors, shuffle } from './src/core/groups.js';
@@ -140,7 +140,7 @@ function question() {
   $('#q-feedback').classList.add('hidden'); $('#btn-dk').classList.remove('hidden');
   const opts = $('#q-options'), form = $('#q-form'), inp = $('#q-input'), intro = $('#q-intro'), prompt = $('#q-prompt');
   opts.innerHTML = ''; form.classList.add('hidden'); opts.classList.add('hidden'); intro.classList.add('hidden'); prompt.classList.remove('hidden');
-  inp.value = ''; inp.className = ''; $('#q-mask').textContent = ''; $('#btn-hint').disabled = false; $('#btn-hint').textContent = 'Подсказка';
+  inp.value = ''; inp.className = ''; $('#q-mask').textContent = ''; renderHintButton();
   const ruList = `<ul class="q-ru">${word.ru.map(r => `<li>${r}</li>`).join('')}</ul>`;
   if (mode === 'intro') {
     prompt.classList.add('hidden'); $('#btn-dk').classList.add('hidden'); intro.classList.remove('hidden');
@@ -169,15 +169,17 @@ function renderOptions(list, isRight) {
   list.forEach(v => { const b = document.createElement('button'); b.className = 'opt'; b.textContent = v; b.onclick = () => answer(isRight(v), v); box.appendChild(b); });
 }
 function hintStep() {
-  const steps = revealed.length / 2;
-  if (steps >= HINT_STEPS) return;
-  revealed = revealMore(cur.word.w, revealed, 2);
+  if (!hintsLeft(cur.word.w, revealed)) return;
+  revealed = revealMore(cur.word.w, revealed);
   $('#q-mask').textContent = mask(cur.word.w, revealed);
   $('#q-input').classList.add('hinted');
-  const left = HINT_STEPS - revealed.length / 2;
-  if (left <= 0 || revealed.length >= cur.word.w.length) { $('#btn-hint').disabled = true; $('#btn-hint').textContent = 'Подсказок больше нет'; }
-  else $('#btn-hint').textContent = `Подсказка (ещё ${left})`;
+  renderHintButton();
   $('#q-input').focus();
+}
+function renderHintButton() {
+  const left = hintsLeft(cur.word.w, revealed), b = $('#btn-hint');
+  b.disabled = !left;
+  b.textContent = !left ? 'Подсказок больше нет' : revealed.length ? `Подсказка (ещё ${left})` : `Подсказка (${left})`;
 }
 let introLock = 0;
 function introNext() { const t = Date.now(); if (t - introLock < 350) return; introLock = t; stageDone++; qi++; question(); }

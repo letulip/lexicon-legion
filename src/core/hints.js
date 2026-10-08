@@ -1,11 +1,23 @@
 // Letter hints for the typing modes. Pure.
-// revealed = sorted array of letter indices shown; each step opens `step` more random positions.
-export const HINT_STEPS = 2;
-export function revealMore(word, revealed = [], step = 2, rnd = Math.random) {
+// Budget scales with the word: each step opens a quarter of the letters (at least one), and the
+// hints never reveal more than half of the word — a short word gets one step, a long one two.
+export const HINT_SHARE = 0.25, HINT_CAP = 0.5;
+const letters = (word) => [...word].filter(ch => /[a-z]/i.test(ch)).length;
+export function hintBudget(word) {
+  const n = letters(word);
+  return { step: Math.max(1, Math.round(n * HINT_SHARE)), cap: Math.max(1, Math.floor(n * HINT_CAP)) };
+}
+export function hintsLeft(word, revealed = []) {
+  const { step, cap } = hintBudget(word);
+  return Math.max(0, Math.ceil((cap - revealed.length) / step));
+}
+// revealed = sorted array of letter indices shown; one step opens `step` more random positions (up to cap).
+export function revealMore(word, revealed = [], rnd = Math.random) {
+  const { step, cap } = hintBudget(word);
   const hidden = [];
   for (let i = 0; i < word.length; i++) if (!revealed.includes(i) && /[a-z]/i.test(word[i])) hidden.push(i);
   const out = [...revealed];
-  while (hidden.length && out.length - revealed.length < step) {
+  while (hidden.length && out.length < cap && out.length - revealed.length < step) {
     const k = Math.floor(rnd() * hidden.length);
     out.push(hidden.splice(k, 1)[0]);
   }
