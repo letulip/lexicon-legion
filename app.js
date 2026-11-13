@@ -6,9 +6,11 @@ import { checkAnswer } from './src/core/matching.js';
 import { revealMore, mask, hintsLeft } from './src/core/hints.js';
 import { levelFromXp, xpIntoLevel, xpForNextLevel, rankTitle } from './src/core/leveling.js';
 import { advanceStreak, todayStr } from './src/core/streak.js';
+import { GEN_VERSION, GRID_W, GRID_H, MAX_LEN, MIN_MET, buildPacks, packUnlocked, dailyPuzzle } from './src/core/crossword.js';
+import { newPlay, setLetter, clearLetter, revealCell, revealWord, noteHint, checkPlay, entryFilled, entryCells, scorePlay, applySolved } from './src/core/xw-play.js';
 import { mergeGroups, pickDistractors, pickWordDistractors, shuffle } from './src/core/groups.js';
 
-export const APP_VERSION = '0.3.0';
+export const APP_VERSION = '0.4.0';
 const STORE_KEY = 'lexicon.store';
 const $ = (s) => document.querySelector(s);
 const MODE_NAMES = { pick: 'узнавание', reverse: 'обратное', type: 'письмо', cloze: 'контекст', trouble: 'разбор ошибки', intro: 'знакомство' };
@@ -52,9 +54,11 @@ function go(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
   $('#screen-' + id).classList.remove('hidden');
   window.scrollTo(0, 0);
+  if (id !== 'xwplay') $('#xw-input').blur();   // leaving a crossword closes the system keyboard
   if (id === 'home') renderHome();
   if (id === 'settings') renderSettings();
   if (id === 'trouble') renderTrouble();
+  if (id === 'xw') renderXw();
 }
 
 // ---------- home ----------
@@ -75,6 +79,8 @@ function renderHome() {
   $('#btn-learn').disabled = !batch;
   $('#mc-trouble').textContent = sm.trouble ? `${sm.trouble} слов с промахами` : 'промахов нет';
   $('#btn-trouble').disabled = !sm.trouble;
+  $('#mc-xw').textContent = xwHomeText();
+  if (!xwWarmed) { xwWarmed = true; setTimeout(warmXw, 1200); }   // after the first paint and first taps; packs come from the cache on later runs
   $('#t-hint').textContent = words.length ? '' : 'Нет подключённых легионов.';
   $('#groups-sub').textContent = `${words.length} слов в строю`;
   const box = $('#groups'); box.innerHTML = '';
@@ -261,7 +267,7 @@ function speak(text) {
 function renderSettings() {
   const s = store.settings;
   $('#set-dailyNew').value = s.dailyNew; $('#set-learnBatch').value = s.learnBatch; $('#set-reviewSize').value = s.reviewSize; $('#set-accent').value = s.accent;
-  $('#set-rate').value = s.rate; $('#set-sound').checked = s.sound; $('#set-dark').value = s.dark;
+  $('#set-rate').value = s.rate; $('#set-sound').checked = s.sound; $('#set-dark').value = s.dark; $('#set-xwKeyboard').value = s.xwKeyboard || 'system';
   loadVoices();
   const sel = $('#set-voice'); sel.innerHTML = '<option value="">системный</option>' + voices.map(v => `<option value="${v.voiceURI}">${v.name} (${v.lang})</option>`).join('');
   sel.value = s.voiceURI || '';
@@ -277,6 +283,7 @@ function bindSettings() {
   on('#set-voice', t => store.settings.voiceURI = t.value);
   on('#set-rate', t => store.settings.rate = +t.value);
   on('#set-sound', t => store.settings.sound = t.checked);
+  on('#set-xwKeyboard', t => store.settings.xwKeyboard = t.value);
   on('#set-dark', t => { store.settings.dark = t.value; applyTheme(); });
   $('#btn-export').onclick = () => download(`lexicon-legion-progress-${todayStr()}.json`, JSON.stringify(store, null, 1));
   $('#file-import').onchange = (e) => readFile(e.target.files[0], (data) => {
@@ -306,6 +313,222 @@ function importAssess(data) {
 function readFile(file, cb) { if (!file) return; const r = new FileReader(); r.onload = () => { try { cb(JSON.parse(r.result)); } catch (e) { alert('Не удалось прочитать JSON.'); } }; r.readAsText(file); }
 function download(name, text) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
 
+// ---------- crosswords ----------
+const xwPacks = {}, xwWordMap = {}; let xwDaily = null, xwWarmed = false, xs = null;
+const isMet = (id) => { const p = store.progress[id]; return !!p && (p.correct + p.wrong) > 0; };
+const xwKey = (x, y) => x + ',' + y;
+const xwGroups = () => catalog.groups.filter(g => store.groups[g.id] && store.groups[g.id].enabled);
+const xwWord = (id) => { if (!xwWordMap[id]) for (const g of groupsData) for (const w of g.words) xwWordMap[w.id] = w; return xwWordMap[id] || words.find(w => w.id === id); };
+// met words a crossword can actually use — the same filter the generator applies
+const xwMetCount = () => words.filter(w => isMet(w.id) && /^[a-z]+$/.test(w.w) && w.w.length <= MAX_LEN).length;
+// Packs are deterministic, so they are built once per group version and kept in localStorage (own key, not the
+// progress store): building takes ~0.2 s per 400 words on a laptop and several times that on a phone.
+function getPacks(gid) {
+  if (xwPacks[gid]) return xwPacks[gid];
+  const gd = groupsData.find(g => g.id === gid); if (!gd) return xwPacks[gid] = [];
+  const n = gd.words.length, sig = `${GEN_VERSION}:${gd.version || 1}:${n}:${n ? gd.words[n - 1].id : ''}`, ck = 'lexicon.xwpacks.' + gid;
+  try { const c = JSON.parse(localStorage.getItem(ck)); if (c && c.sig === sig && Array.isArray(c.packs)) return xwPacks[gid] = c.packs; } catch (e) {}
+  xwPacks[gid] = buildPacks(gd.words, { groupId: gid });
+  try { localStorage.setItem(ck, JSON.stringify({ sig, packs: xwPacks[gid] })); } catch (e) {}
+  return xwPacks[gid];
+}
+function xwDailyPuzzle() { const k = todayStr() + ':' + xwMetCount(); if (!xwDaily || xwDaily.k !== k) xwDaily = { k, p: dailyPuzzle(words, store.progress, todayStr()) }; return xwDaily.p; }
+function xwTotals() {
+  let open = 0, total = 0, done = 0;
+  for (const g of xwGroups()) { const d = (store.crosswords.packs[g.id] || {}).done || {}; for (const p of getPacks(g.id)) { total++; if (packUnlocked(p, isMet)) open++; if (d[p.key]) done++; } }
+  return { open, total, done };
+}
+function xwHomeText() {
+  const d = store.crosswords.daily, n = xwMetCount();
+  const day = d && d.date === todayStr() ? (d.done ? 'кроссворд дня решён' : 'кроссворд дня начат') : n >= MIN_MET ? 'кроссворд дня готов' : `встретьте ещё слов: ${MIN_MET - n} для кроссворда дня`;
+  if (!xwGroups().every(g => xwPacks[g.id])) return day;
+  const t = xwTotals(); return `${day} · открыто ${t.open} из ${t.total}`;
+}
+function warmXw(i = 0) {
+  const gs = xwGroups(); if (i >= gs.length) return;                       // enabled groups only, one per tick
+  getPacks(gs[i].id); $('#mc-xw').textContent = xwHomeText(); setTimeout(() => warmXw(i + 1), 50);
+}
+function renderXw() {
+  const d = store.crosswords.daily, today = d && d.date === todayStr(), p = today ? null : xwDailyPuzzle(), b = $('#xw-daily');
+  b.textContent = today ? (d.done ? 'Посмотреть' : 'Продолжить') : 'Начать'; b.disabled = !today && !p;
+  $('#xw-daily-state').textContent = today ? (d.done ? 'Решён сегодня. Следующий будет завтра.' : 'Начат, прогресс сохранён.') : p ? 'Готов: один кроссворд в день из слов, которые вы уже встречали.' : `Нужно встретить не меньше ${MIN_MET} слов – пройдите «Новые слова» или «Повторение».`;
+  $('#xw-groups').innerHTML = xwGroups().map(g => {
+    const rec = store.crosswords.packs[g.id] || { done: {}, current: null }, packs = getPacks(g.id);
+    const open = packs.filter(p => packUnlocked(p, isMet)).length, solved = packs.filter(p => rec.done[p.key]).length;
+    return `<div class="card"><b>${g.title}</b><p class="muted small">решено ${solved} · открыто ${open} из ${packs.length}</p><div class="xw-tiles">${packs.map(p => {
+      const dn = rec.done[p.key], cu = rec.current && rec.current.key === p.key, lk = !dn && !cu && !packUnlocked(p, isMet);
+      return `<button class="xw-tile ${dn ? 'done' : cu ? 'current open' : lk ? 'locked' : 'open'}" data-g="${g.id}" data-n="${p.n}" ${lk ? 'disabled' : ''}>${lk ? '🔒' : dn ? p.n + '✓' : p.n}</button>`;
+    }).join('')}</div></div>`;
+  }).join('');
+}
+function openXw(ref) {
+  const cw = store.crosswords, date = todayStr(); let play, done = false, title, note = '';
+  if (ref.kind === 'daily') {
+    title = 'Кроссворд дня'; const d = cw.daily;
+    if (d && d.date === date) { play = d.play; done = d.done; note = d.date; }
+    else { const p = xwDailyPuzzle(); if (!p) return; play = newPlay(p); }
+    ref = { kind: 'daily', date };                       // the puzzle keeps the date it was made for, even if solved after midnight
+  } else {
+    const pack = getPacks(ref.groupId).find(p => p.n === ref.n), rec = cw.packs[ref.groupId] || { done: {}, current: null };
+    if (!pack) return;
+    ref = { ...ref, key: pack.key };
+    title = `№ ${ref.n} · ${catalog.groups.find(g => g.id === ref.groupId).title}`;
+    if (rec.done[pack.key]) { done = true; note = rec.done[pack.key]; play = newPlay(pack); play.fill = { ...pack.cells }; }
+    else if (rec.current && rec.current.key === pack.key) play = rec.current.play;
+    else {
+      const c = rec.current;
+      if (c && Object.keys(c.play.fill).length && !confirm(`В этом легионе уже начат кроссворд № ${c.n}. Начать другой? Заполненное сотрётся.`)) return;
+      play = newPlay(pack);                                // becomes `current` on the first change (xwSave), not on opening
+    }
+  }
+  xs = { ref, play, done, title, note, date, ei: 0, cur: 0, wrong: new Set(), status: '', res: null };
+  const i = play.puzzle.entries.findIndex(e => !entryFilled(play, e));
+  xwSelect(i < 0 ? 0 : i); go('xwplay'); xwPaint(); xwFocusInput();
+}
+const xwEntry = () => xs.play.puzzle.entries[xs.ei];
+const xwCell = () => entryCells(xwEntry())[xs.cur];
+function xwSelect(i, k) {
+  xs.ei = i; const cs = entryCells(xs.play.puzzle.entries[i]);
+  xs.cur = k != null ? k : Math.max(0, cs.findIndex(c => !(xwKey(c.x, c.y) in xs.play.fill)));
+}
+function xwPaint() {
+  const pz = xs.play.puzzle, e = xwEntry(), cc = xwCell(), act = new Set(entryCells(e).map(c => xwKey(c.x, c.y))), starts = {}, w = xwWord(e.id);
+  pz.entries.forEach(x => starts[xwKey(x.x, x.y)] = x.num);
+  // only the rows the puzzle uses are drawn: every spare row is height the keyboard would rather have
+  const ys = Object.keys(pz.cells).map(k => +k.split(',')[1]), y0 = Math.min(...ys), y1 = Math.max(...ys); xs.rows = y1 - y0 + 1;
+  let h = '';
+  for (let y = y0; y <= y1; y++) for (let x = 0; x < GRID_W; x++) {
+    const k = xwKey(x, y);
+    if (!(k in pz.cells)) { h += '<div class="xw-c off"></div>'; continue; }
+    const cls = [act.has(k) && 'act', cc.x === x && cc.y === y && !xs.done && 'cur', xs.play.revealed[k] && 'rev', xs.wrong.has(k) && 'wrong'].filter(Boolean).join(' ');
+    h += `<div class="xw-c ${cls}" data-x="${x}" data-y="${y}">${starts[k] ? `<s>${starts[k]}</s>` : ''}${xs.play.fill[k] || ''}</div>`;
+  }
+  $('#xw-grid').innerHTML = h; $('#xw-grid').style.gridTemplateColumns = `repeat(${GRID_W}, var(--xw-cell))`;
+  $('#xw-title').textContent = xs.title;
+  $('#xw-clue').innerHTML = `<b>${e.num} ${e.dir === 'a' ? '→' : '↓'}</b> ${w ? (POS[w.pos] || '') + ' · ' + w.ru.join('; ') : ''} · ${e.word.length} букв`;
+  const shown = xs.play.ctxWords && xs.play.ctxWords[e.id] && w && w.ex && w.ex[0];
+  $('#xw-ctx').innerHTML = shown ? clozeText(w) : ''; $('#xw-ctx').classList.toggle('hidden', !shown);
+  for (const id of ['cell', 'word', 'ctx']) $('#xw-hint-' + id).disabled = xs.done || (id === 'ctx' && !(w && w.ex && w.ex[0]));
+  const stText = xs.done ? (xs.note ? 'Решён ' + xs.note : 'Решён') : xs.status;
+  $('#xw-status').textContent = stText; $('#xw-status').classList.toggle('hidden', !stText);
+  $('#xw-check').disabled = xs.done;
+  $('#xw-check').classList.toggle('pulse', !xs.done && Object.keys(xs.play.fill).length === Object.keys(pz.cells).length);
+  $('#xw-kb').classList.toggle('hidden', store.settings.xwKeyboard !== 'own' || xs.done);
+  $('#xw-result').classList.toggle('hidden', !xs.res);
+  if (xs.res) $('#xw-res-text').innerHTML = `<b>Решено!</b> ${xs.res.already ? 'уже засчитано' : '+' + xs.sc.xp + ' XP'} · подсказок: ${xs.sc.hints} · слов не открыто: ${xs.sc.cleanWords} из ${xs.sc.words}${xs.mins < 180 ? ` · время: ${Math.max(1, xs.mins)} мин` : ''}`;
+  xwFit();
+}
+function xwSave() {
+  const cw = store.crosswords, r = xs.ref;
+  if (r.kind === 'daily') cw.daily = { date: xs.date, play: xs.play, done: false };
+  else (cw.packs[r.groupId] || (cw.packs[r.groupId] = { done: {}, current: null })).current = { n: r.n, key: r.key, play: xs.play };
+  save();
+}
+function xwChanged() { xs.status = ''; xwSave(); xwPaint(); }
+function xwAdvance() { xs.cur = Math.min(xs.cur + 1, xwEntry().word.length - 1); }
+// System keyboard: a hidden field takes the letters. It is reset to a one-character sentinel after every
+// event, so the keyboard never holds more than one letter of the answer (its suggestion strip has nothing
+// to complete) and Backspace on the "empty" field still produces an input event.
+const XW_SENT = '\u200b';
+function xwFocusInput() {
+  const i = $('#xw-input');
+  if (!xs || xs.done || store.settings.xwKeyboard !== 'system') { i.blur(); return; }
+  i.value = XW_SENT;
+  if (document.activeElement === i) i.blur();   // already focused but the keyboard may have been dismissed with Back: focus() alone would be a no-op
+  i.focus({ preventScroll: true });
+}
+function xwOnInput() {
+  const i = $('#xw-input'), v = i.value; i.value = XW_SENT;
+  if (!v.includes(XW_SENT) && !/[a-z]/i.test(v)) return xwBackspace();          // sentinel deleted: Backspace
+  const letters = [...v.toLowerCase()].filter(ch => ch >= 'a' && ch <= 'z');
+  if (letters.length === 1) xwType(letters[0]); else if (letters.length > 1) xwTypeMany(letters);
+}
+// Several letters at once = a swiped word. One as long as the entry (or longer) is laid from the first cell;
+// a shorter piece goes from the cursor and stops at the end of the entry. Revealed cells stay as they are.
+function xwTypeMany(letters) {
+  if (!xs || xs.done) return;
+  const cs = entryCells(xwEntry()), start = letters.length >= cs.length ? 0 : xs.cur;
+  letters.slice(0, cs.length - start).forEach((ch, i) => { const c = cs[start + i]; setLetter(xs.play, c.x, c.y, ch); xs.wrong.delete(xwKey(c.x, c.y)); });
+  xs.cur = Math.min(start + letters.length, cs.length - 1); xwChanged();
+}
+// Size the grid to what is visible above the keyboard (system: the visual viewport shrinks; own: it is part of the page).
+function xwFit() {
+  const g = $('#xw-grid'); if (!xs || $('#screen-xwplay').classList.contains('hidden')) return;
+  const vv = window.visualViewport, vh = vv ? vv.height : innerHeight;
+  const below = ['#xw-status', '.xw-actions', '#xw-kb', '#xw-ctx'].reduce((a, q) => { const el = $(q); return a + (el && !el.classList.contains('hidden') ? el.offsetHeight + 8 : 0); }, 10);
+  const rows = xs.rows || GRID_H, byH = Math.floor((vh - g.offsetTop - below - (rows - 1) * 2) / rows), byW = Math.floor((Math.min(innerWidth, 640) - 34 - (GRID_W - 1) * 2) / GRID_W);
+  g.style.setProperty('--xw-cell', Math.max(24, Math.min(44, byH, byW)) + 'px');
+}
+function xwType(ch) {
+  if (!xs || xs.done) return;
+  const c = xwCell(); setLetter(xs.play, c.x, c.y, ch); xs.wrong.delete(xwKey(c.x, c.y)); xwAdvance(); xwChanged();
+}
+function xwBackspace() {
+  if (!xs || xs.done) return;
+  let c = xwCell(), k = xwKey(c.x, c.y);
+  if (!(k in xs.play.fill) || xs.play.revealed[k]) { if (xs.cur > 0) xs.cur--; c = xwCell(); k = xwKey(c.x, c.y); }
+  clearLetter(xs.play, c.x, c.y); xs.wrong.delete(k); xwChanged();
+}
+function xwTap(x, y) {
+  const es = xs.play.puzzle.entries, at = es.map((e, i) => i).filter(i => entryCells(es[i]).some(c => c.x === x && c.y === y));
+  if (!at.length) return;
+  const c = xwCell(), same = c.x === x && c.y === y;
+  const i = same && at.length > 1 ? at.find(j => j !== xs.ei) : at.includes(xs.ei) ? xs.ei : (at.find(j => es[j].dir === xwEntry().dir) ?? at[0]);
+  xwSelect(i, entryCells(es[i]).findIndex(c => c.x === x && c.y === y)); xwPaint(); xwFocusInput();
+}
+function xwStep(d) { const n = xs.play.puzzle.entries.length; xwSelect((xs.ei + d + n) % n); xwPaint(); xwFocusInput(); }
+function xwMove(dir, d) {
+  const es = xs.play.puzzle.entries;
+  if (xwEntry().dir === dir) xs.cur = Math.max(0, Math.min(xwEntry().word.length - 1, xs.cur + d));
+  else {
+    const c = xwCell(), at = (e) => entryCells(e).findIndex(q => q.x === c.x && q.y === c.y), j = es.findIndex(e => e.dir === dir && at(e) >= 0);
+    if (j < 0) return; xwSelect(j, at(es[j]));
+  }
+  xwPaint();
+}
+function xwHint(kind) {
+  if (!xs || xs.done) return;
+  const e = xwEntry(), c = xwCell(), p = xs.play;
+  if (kind === 'cell') { if (revealCell(p, c.x, c.y)) { xs.wrong.delete(xwKey(c.x, c.y)); xwAdvance(); } }
+  else if (kind === 'word') { if (revealWord(p, e)) entryCells(e).forEach(q => xs.wrong.delete(xwKey(q.x, q.y))); }
+  else { p.ctxWords = p.ctxWords || {}; if (!p.ctxWords[e.id]) { p.ctxWords[e.id] = true; noteHint(p); } }
+  xwChanged(); xwFocusInput();
+}
+function xwCheck() {
+  if (!xs || xs.done) return;
+  const r = checkPlay(xs.play); xs.wrong = new Set(r.wrong);
+  if (r.solved) {
+    xs.res = applySolved(store, xs.ref, xs.play, todayStr()); xs.sc = scorePlay(xs.play); xs.done = true; save();
+    xs.mins = Math.round((Date.now() - xs.play.startedAt) / 60000);
+  } else xs.status = `неверных букв: ${r.wrong.length}, пустых клеток: ${r.empty}`;
+  xwPaint(); xwFocusInput();   // solved: the field is blurred and the keyboard closes; otherwise typing continues
+}
+function wireXw() {
+  $('#btn-xw').onclick = () => go('xw'); $('#xw-back').onclick = () => go('xw');
+  $('#xw-daily').onclick = () => openXw({ kind: 'daily' });
+  $('#xw-groups').onclick = (e) => { const t = e.target.closest('.xw-tile'); if (t && !t.disabled) openXw({ kind: 'pack', groupId: t.dataset.g, n: +t.dataset.n }); };
+  $('#xw-grid').onclick = (e) => { const c = e.target.closest('.xw-c'); if (c && c.dataset.x != null && xs && !xs.done) xwTap(+c.dataset.x, +c.dataset.y); };
+  $('#xw-prev').onclick = () => xwStep(-1); $('#xw-next').onclick = () => xwStep(1);
+  $('#xw-hint-cell').onclick = () => xwHint('cell'); $('#xw-hint-word').onclick = () => xwHint('word'); $('#xw-hint-ctx').onclick = () => xwHint('ctx');
+  $('#xw-check').onclick = xwCheck;
+  $('#xw-kb').innerHTML = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'].map((r, i) => `<div>${[...r].map(c => `<button data-k="${c}">${c}</button>`).join('')}${i === 2 ? '<button class="xw-bs" data-k="bs">⌫</button>' : ''}</div>`).join('');
+  $('#xw-kb').onmousedown = $('.xw-actions').onmousedown = $('.xw-clue').onmousedown = (e) => e.preventDefault();   // buttons must not steal focus from the field (keeps the system keyboard open)
+  $('#xw-input').addEventListener('input', xwOnInput);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { if (xs && !$('#screen-xwplay').classList.contains('hidden')) { window.scrollTo(0, 0); xwFit(); } });
+  window.addEventListener('resize', xwFit);
+  $('#xw-kb').onclick = (e) => { const k = e.target.dataset.k; if (k === 'bs') xwBackspace(); else if (k) xwType(k); };
+  document.addEventListener('keydown', (e) => {
+    if ($('#screen-xwplay').classList.contains('hidden') || !xs || e.ctrlKey || e.metaKey || e.altKey) return;
+    const inField = e.target.id === 'xw-input';          // letters and Backspace typed into the hidden field arrive via its input event
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) && !inField) return;
+    if (inField && (/^[a-zA-Z]$/.test(e.key) || e.key === 'Backspace')) return;
+    const k = e.key, arrows = { ArrowRight: ['a', 1], ArrowLeft: ['a', -1], ArrowDown: ['d', 1], ArrowUp: ['d', -1] };
+    if (/^[a-zA-Z]$/.test(k)) xwType(k); else if (k === 'Backspace') xwBackspace(); else if (k === 'Enter') xwCheck();
+    else if (k === 'Tab') xwStep(e.shiftKey ? -1 : 1); else if (arrows[k] && !xs.done) xwMove(...arrows[k]); else return;
+    e.preventDefault();
+  });
+}
+
 // ---------- wiring ----------
 function wire() {
   document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
@@ -325,7 +548,7 @@ function wire() {
     if (/^[1-4]$/.test(e.key)) { const b = document.querySelectorAll('.opt')[+e.key - 1]; if (b) b.click(); }
     else if (e.key === '0') $('#btn-dk').click();
   });
-  bindSettings();
+  bindSettings(); wireXw();
   if (window.speechSynthesis) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 }

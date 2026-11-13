@@ -38,6 +38,7 @@
       <button class="mode-card" id="btn-review"><span class="mc-ico">🔁</span><span class="mc-body"><b>Повторение</b><small id="mc-review"></small></span><span class="mc-go">→</span></button>
       <button class="mode-card" id="btn-learn"><span class="mc-ico">✨</span><span class="mc-body"><b>Новые слова</b><small id="mc-learn"></small></span><span class="mc-go">→</span></button>
       <button class="mode-card" id="btn-trouble"><span class="mc-ico">🩹</span><span class="mc-body"><b>Работа над ошибками</b><small id="mc-trouble"></small></span><span class="mc-go">→</span></button>
+      <button class="mode-card" id="btn-xw"><span class="mc-ico">🧩</span><span class="mc-body"><b>Кроссворды</b><small id="mc-xw"></small></span><span class="mc-go">→</span></button>
     </div>
     <p class="muted small" id="t-hint"></p>
     <h2 class="h2">Легионы <span class="muted small" id="groups-sub"></span></h2>
@@ -106,6 +107,34 @@
     </div>
   </section>
 
+  <!-- CROSSWORDS -->
+  <section class="screen hidden" id="screen-xw">
+    <header class="bar"><button class="link" data-go="home">← домой</button><span class="counter">Кроссворды</span></header>
+    <div class="card">
+      <h2 class="h2">Кроссворд дня</h2>
+      <p class="muted small" id="xw-daily-state"></p>
+      <button class="btn primary wide" id="xw-daily">Начать</button>
+    </div>
+    <div id="xw-groups"></div>
+  </section>
+
+  <section class="screen hidden" id="screen-xwplay">
+    <header class="bar"><button class="link" id="xw-back">← назад</button><span class="counter" id="xw-title"></span></header>
+    <div class="xw-clue"><button class="btn" id="xw-prev" title="Предыдущее слово">‹</button><div id="xw-clue"></div><button class="btn" id="xw-next" title="Следующее слово">›</button></div>
+    <input id="xw-input" class="xw-input" type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" aria-label="Ввод букв кроссворда" />
+    <div id="xw-grid"></div>
+    <p class="muted small xw-status" id="xw-status"></p>
+    <p class="ctx hidden" id="xw-ctx"></p>
+    <div class="xw-actions">
+      <button class="btn" id="xw-hint-cell">Буква</button><button class="btn" id="xw-hint-word">Слово</button><button class="btn" id="xw-hint-ctx">Фраза</button><button class="btn primary" id="xw-check">Проверить</button>
+    </div>
+    <div id="xw-kb" class="xw-kb hidden"></div>
+    <div id="xw-result" class="card hidden">
+      <p id="xw-res-text"></p>
+      <div class="row"><button class="btn primary" data-go="xw">К кроссвордам</button><button class="btn" data-go="home">Домой</button></div>
+    </div>
+  </section>
+
   <!-- SETTINGS -->
   <section class="screen hidden" id="screen-settings">
     <header class="bar"><button class="link" data-go="home">← домой</button><span class="counter">Настройки</span></header>
@@ -116,6 +145,7 @@
       <label>Акцент <select id="set-accent"><option value="en-US">en-US</option><option value="en-GB">en-GB</option></select></label>
       <label>Голос <select id="set-voice"><option value="">системный</option></select></label>
       <label>Скорость речи <input id="set-rate" type="range" min="0.6" max="1.3" step="0.1" /></label>
+      <label>Клавиатура в кроссвордах <select id="set-xwKeyboard"><option value="system">системная</option><option value="own">своя буквенная</option></select></label>
       <label class="chk"><input type="checkbox" id="set-sound" /> Озвучивать ответ</label>
       <label>Тема <select id="set-dark"><option value="auto">как в системе</option><option value="dark">тёмная</option><option value="light">светлая</option></select></label>
     </div>
