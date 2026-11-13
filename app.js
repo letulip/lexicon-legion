@@ -10,7 +10,7 @@ import { GRID_W, GRID_H, MIN_MET, buildPacks, packUnlocked, dailyPuzzle } from '
 import { newPlay, setLetter, clearLetter, revealCell, revealWord, noteHint, checkPlay, entryFilled, entryCells, scorePlay, applySolved } from './src/core/xw-play.js';
 import { mergeGroups, pickDistractors, pickWordDistractors, shuffle } from './src/core/groups.js';
 
-export const APP_VERSION = '0.3.0';
+export const APP_VERSION = '0.4.0';
 const STORE_KEY = 'lexicon.store';
 const $ = (s) => document.querySelector(s);
 const MODE_NAMES = { pick: 'узнавание', reverse: 'обратное', type: 'письмо', cloze: 'контекст', trouble: 'разбор ошибки', intro: 'знакомство' };
@@ -54,6 +54,7 @@ function go(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
   $('#screen-' + id).classList.remove('hidden');
   window.scrollTo(0, 0);
+  if (id !== 'xwplay') $('#xw-input').blur();   // leaving a crossword closes the system keyboard
   if (id === 'home') renderHome();
   if (id === 'settings') renderSettings();
   if (id === 'trouble') renderTrouble();
@@ -356,7 +357,7 @@ function openXw(ref) {
     else { const p = xwDailyPuzzle(); if (!p) return; play = newPlay(p); }
   } else {
     const pack = getPacks(ref.groupId).find(p => p.n === ref.n), rec = cw.packs[ref.groupId] || (cw.packs[ref.groupId] = { done: {}, current: null });
-    title = `${catalog.groups.find(g => g.id === ref.groupId).title} · № ${ref.n}`;
+    title = `№ ${ref.n} · ${catalog.groups.find(g => g.id === ref.groupId).title}`;
     if (rec.done[ref.n]) { done = true; note = rec.done[ref.n]; play = newPlay(pack); play.fill = { ...pack.cells }; }
     else if (rec.current && rec.current.n === ref.n) play = rec.current.play;
     else {
@@ -367,7 +368,7 @@ function openXw(ref) {
   }
   xs = { ref, play, done, title, note, date, ei: 0, cur: 0, wrong: new Set(), status: '', res: null };
   const i = play.puzzle.entries.findIndex(e => !entryFilled(play, e));
-  xwSelect(i < 0 ? 0 : i); go('xwplay'); xwPaint();
+  xwSelect(i < 0 ? 0 : i); go('xwplay'); xwPaint(); xwFocusInput();
 }
 const xwEntry = () => xs.play.puzzle.entries[xs.ei];
 const xwCell = () => entryCells(xwEntry())[xs.cur];
@@ -378,8 +379,10 @@ function xwSelect(i, k) {
 function xwPaint() {
   const pz = xs.play.puzzle, e = xwEntry(), cc = xwCell(), act = new Set(entryCells(e).map(c => xwKey(c.x, c.y))), starts = {}, w = xwWord(e.id);
   pz.entries.forEach(x => starts[xwKey(x.x, x.y)] = x.num);
+  // only the rows the puzzle uses are drawn: every spare row is height the keyboard would rather have
+  const ys = Object.keys(pz.cells).map(k => +k.split(',')[1]), y0 = Math.min(...ys), y1 = Math.max(...ys); xs.rows = y1 - y0 + 1;
   let h = '';
-  for (let y = 0; y < GRID_H; y++) for (let x = 0; x < GRID_W; x++) {
+  for (let y = y0; y <= y1; y++) for (let x = 0; x < GRID_W; x++) {
     const k = xwKey(x, y);
     if (!(k in pz.cells)) { h += '<div class="xw-c off"></div>'; continue; }
     const cls = [act.has(k) && 'act', cc.x === x && cc.y === y && !xs.done && 'cur', xs.play.revealed[k] && 'rev', xs.wrong.has(k) && 'wrong'].filter(Boolean).join(' ');
@@ -391,12 +394,14 @@ function xwPaint() {
   const shown = xs.play.ctxWords && xs.play.ctxWords[e.id] && w && w.ex && w.ex[0];
   $('#xw-ctx').innerHTML = shown ? clozeText(w) : ''; $('#xw-ctx').classList.toggle('hidden', !shown);
   for (const id of ['cell', 'word', 'ctx']) $('#xw-hint-' + id).disabled = xs.done || (id === 'ctx' && !(w && w.ex && w.ex[0]));
-  $('#xw-status').textContent = xs.done ? (xs.note ? 'Решён ' + xs.note : 'Решён') : xs.status;
+  const stText = xs.done ? (xs.note ? 'Решён ' + xs.note : 'Решён') : xs.status;
+  $('#xw-status').textContent = stText; $('#xw-status').classList.toggle('hidden', !stText);
   $('#xw-check').disabled = xs.done;
   $('#xw-check').classList.toggle('pulse', !xs.done && Object.keys(xs.play.fill).length === Object.keys(pz.cells).length);
   $('#xw-kb').classList.toggle('hidden', store.settings.xwKeyboard !== 'own' || xs.done);
   $('#xw-result').classList.toggle('hidden', !xs.res);
   if (xs.res) $('#xw-res-text').innerHTML = `<b>Решено!</b> ${xs.res.already ? 'уже засчитано' : '+' + xs.sc.xp + ' XP'} · подсказок: ${xs.sc.hints} · слов не открыто: ${xs.sc.cleanWords} из ${xs.sc.words}`;
+  xwFit();
 }
 function xwSave() {
   const cw = store.crosswords, r = xs.ref;
@@ -406,7 +411,28 @@ function xwSave() {
 }
 function xwChanged() { xs.status = ''; xwSave(); xwPaint(); }
 function xwAdvance() { xs.cur = Math.min(xs.cur + 1, xwEntry().word.length - 1); }
-function xwFocusInput() {}
+// System keyboard: a hidden field takes the letters. It is reset to a one-character sentinel after every
+// event, so the keyboard never holds more than one letter of the answer (its suggestion strip has nothing
+// to complete) and Backspace on the "empty" field still produces an input event.
+const XW_SENT = '\u200b';
+function xwFocusInput() {
+  const i = $('#xw-input');
+  if (!xs || xs.done || store.settings.xwKeyboard !== 'system') { i.blur(); return; }
+  i.value = XW_SENT; i.focus({ preventScroll: true });
+}
+function xwOnInput() {
+  const i = $('#xw-input'), v = i.value; i.value = XW_SENT;
+  if (!v.includes(XW_SENT) && !/[a-z]/i.test(v)) return xwBackspace();          // sentinel deleted: Backspace
+  for (const ch of v.toLowerCase()) if (ch >= 'a' && ch <= 'z') xwType(ch);     // one tap = one letter; a swiped word = all its letters
+}
+// Size the grid to what is visible above the keyboard (system: the visual viewport shrinks; own: it is part of the page).
+function xwFit() {
+  const g = $('#xw-grid'); if (!xs || $('#screen-xwplay').classList.contains('hidden')) return;
+  const vv = window.visualViewport, vh = vv ? vv.height : innerHeight;
+  const below = ['#xw-status', '.xw-actions', '#xw-kb', '#xw-ctx'].reduce((a, q) => { const el = $(q); return a + (el && !el.classList.contains('hidden') ? el.offsetHeight + 8 : 0); }, 10);
+  const rows = xs.rows || GRID_H, byH = Math.floor((vh - g.offsetTop - below - (rows - 1) * 2) / rows), byW = Math.floor((Math.min(innerWidth, 640) - 34 - (GRID_W - 1) * 2) / GRID_W);
+  g.style.setProperty('--xw-cell', Math.max(24, Math.min(44, byH, byW)) + 'px');
+}
 function xwType(ch) {
   if (!xs || xs.done) return;
   const c = xwCell(); setLetter(xs.play, c.x, c.y, ch); xs.wrong.delete(xwKey(c.x, c.y)); xwAdvance(); xwChanged();
@@ -459,10 +485,16 @@ function wireXw() {
   $('#xw-hint-cell').onclick = () => xwHint('cell'); $('#xw-hint-word').onclick = () => xwHint('word'); $('#xw-hint-ctx').onclick = () => xwHint('ctx');
   $('#xw-check').onclick = xwCheck;
   $('#xw-kb').innerHTML = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'].map((r, i) => `<div>${[...r].map(c => `<button data-k="${c}">${c}</button>`).join('')}${i === 2 ? '<button class="xw-bs" data-k="bs">⌫</button>' : ''}</div>`).join('');
-  $('#xw-kb').onmousedown = (e) => e.preventDefault();
+  $('#xw-kb').onmousedown = $('.xw-actions').onmousedown = $('.xw-clue').onmousedown = (e) => e.preventDefault();   // buttons must not steal focus from the field (keeps the system keyboard open)
+  $('#xw-input').addEventListener('input', xwOnInput);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { if (xs && !$('#screen-xwplay').classList.contains('hidden')) { window.scrollTo(0, 0); xwFit(); } });
+  window.addEventListener('resize', xwFit);
   $('#xw-kb').onclick = (e) => { const k = e.target.dataset.k; if (k === 'bs') xwBackspace(); else if (k) xwType(k); };
   document.addEventListener('keydown', (e) => {
-    if ($('#screen-xwplay').classList.contains('hidden') || !xs || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
+    if ($('#screen-xwplay').classList.contains('hidden') || !xs || e.ctrlKey || e.metaKey || e.altKey) return;
+    const inField = e.target.id === 'xw-input';          // letters and Backspace typed into the hidden field arrive via its input event
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) && !inField) return;
+    if (inField && (/^[a-zA-Z]$/.test(e.key) || e.key === 'Backspace')) return;
     const k = e.key, arrows = { ArrowRight: ['a', 1], ArrowLeft: ['a', -1], ArrowDown: ['d', 1], ArrowUp: ['d', -1] };
     if (/^[a-zA-Z]$/.test(k)) xwType(k); else if (k === 'Backspace') xwBackspace(); else if (k === 'Enter') xwCheck();
     else if (k === 'Tab') xwStep(e.shiftKey ? -1 : 1); else if (arrows[k] && !xs.done) xwMove(...arrows[k]); else return;

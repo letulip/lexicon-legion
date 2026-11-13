@@ -1,4 +1,4 @@
-.xw-clue{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.xw-clue{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .xw-clue .btn{padding:8px 14px;font-size:20px}
 #xw-clue{flex:1;font-size:14px;line-height:1.35;min-width:0}
 #xw-clue b{color:var(--accent)}
@@ -12,9 +12,9 @@
 .xw-c.rev{color:var(--accent2);border-style:dashed}
 .xw-c.cur.rev{color:#1a1300}
 .xw-c.wrong{border-color:var(--bad);color:var(--bad);background:var(--bg2)}
-.xw-status{min-height:1.3em;text-align:center}
+.xw-status{margin:0 0 6px;text-align:center}
 .xw-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0}
-.xw-actions .btn{padding:12px 4px;font-size:15px}
+.xw-actions .btn{padding:9px 4px;font-size:15px}
 .xw-actions .btn:disabled{opacity:.45;cursor:default}
 .xw-actions .pulse{animation:xwpulse 1.2s ease-in-out infinite}
 @keyframes xwpulse{50%{box-shadow:0 0 0 4px var(--accent2)}}
@@ -29,3 +29,7 @@
 .xw-tile.open{border-color:var(--accent2)}
 .xw-tile.current{border-color:var(--accent);color:var(--accent)}
 .xw-tile.done{border-color:var(--ok);color:var(--ok)}
+.xw-input{position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;border:0;padding:0;margin:0;font-size:16px;background:transparent;color:transparent;caret-color:transparent;pointer-events:none}
+#screen-xwplay .bar{margin:2px 0 8px;flex-wrap:nowrap}
+#screen-xwplay .bar .link{white-space:nowrap;flex:none}
+#screen-xwplay .bar .counter{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

@@ -119,8 +119,9 @@
   </section>
 
   <section class="screen hidden" id="screen-xwplay">
-    <header class="bar"><button class="link" id="xw-back">← к кроссвордам</button><span class="counter" id="xw-title"></span></header>
+    <header class="bar"><button class="link" id="xw-back">← назад</button><span class="counter" id="xw-title"></span></header>
     <div class="xw-clue"><button class="btn" id="xw-prev" title="Предыдущее слово">‹</button><div id="xw-clue"></div><button class="btn" id="xw-next" title="Следующее слово">›</button></div>
+    <input id="xw-input" class="xw-input" type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" aria-label="Ввод букв кроссворда" />
     <div id="xw-grid"></div>
     <p class="muted small xw-status" id="xw-status"></p>
     <p class="ctx hidden" id="xw-ctx"></p>
