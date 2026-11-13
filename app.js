@@ -6,6 +6,8 @@ import { checkAnswer } from './src/core/matching.js';
 import { revealMore, mask, hintsLeft } from './src/core/hints.js';
 import { levelFromXp, xpIntoLevel, xpForNextLevel, rankTitle } from './src/core/leveling.js';
 import { advanceStreak, todayStr } from './src/core/streak.js';
+import { GRID_W, GRID_H, MIN_MET, buildPacks, packUnlocked, dailyPuzzle } from './src/core/crossword.js';
+import { newPlay, setLetter, clearLetter, revealCell, revealWord, noteHint, checkPlay, entryFilled, entryCells, scorePlay, applySolved } from './src/core/xw-play.js';
 import { mergeGroups, pickDistractors, pickWordDistractors, shuffle } from './src/core/groups.js';
 
 export const APP_VERSION = '0.3.0';
@@ -55,6 +57,7 @@ function go(id) {
   if (id === 'home') renderHome();
   if (id === 'settings') renderSettings();
   if (id === 'trouble') renderTrouble();
+  if (id === 'xw') renderXw();
 }
 
 // ---------- home ----------
@@ -75,6 +78,8 @@ function renderHome() {
   $('#btn-learn').disabled = !batch;
   $('#mc-trouble').textContent = sm.trouble ? `${sm.trouble} слов с промахами` : 'промахов нет';
   $('#btn-trouble').disabled = !sm.trouble;
+  $('#mc-xw').textContent = xwHomeText();
+  if (!xwWarmed) { xwWarmed = true; setTimeout(warmXw, 150); }
   $('#t-hint').textContent = words.length ? '' : 'Нет подключённых легионов.';
   $('#groups-sub').textContent = `${words.length} слов в строю`;
   const box = $('#groups'); box.innerHTML = '';
@@ -261,7 +266,7 @@ function speak(text) {
 function renderSettings() {
   const s = store.settings;
   $('#set-dailyNew').value = s.dailyNew; $('#set-learnBatch').value = s.learnBatch; $('#set-reviewSize').value = s.reviewSize; $('#set-accent').value = s.accent;
-  $('#set-rate').value = s.rate; $('#set-sound').checked = s.sound; $('#set-dark').value = s.dark;
+  $('#set-rate').value = s.rate; $('#set-sound').checked = s.sound; $('#set-dark').value = s.dark; $('#set-xwKeyboard').value = s.xwKeyboard || 'system';
   loadVoices();
   const sel = $('#set-voice'); sel.innerHTML = '<option value="">системный</option>' + voices.map(v => `<option value="${v.voiceURI}">${v.name} (${v.lang})</option>`).join('');
   sel.value = s.voiceURI || '';
@@ -277,6 +282,7 @@ function bindSettings() {
   on('#set-voice', t => store.settings.voiceURI = t.value);
   on('#set-rate', t => store.settings.rate = +t.value);
   on('#set-sound', t => store.settings.sound = t.checked);
+  on('#set-xwKeyboard', t => store.settings.xwKeyboard = t.value);
   on('#set-dark', t => { store.settings.dark = t.value; applyTheme(); });
   $('#btn-export').onclick = () => download(`lexicon-legion-progress-${todayStr()}.json`, JSON.stringify(store, null, 1));
   $('#file-import').onchange = (e) => readFile(e.target.files[0], (data) => {
@@ -306,6 +312,164 @@ function importAssess(data) {
 function readFile(file, cb) { if (!file) return; const r = new FileReader(); r.onload = () => { try { cb(JSON.parse(r.result)); } catch (e) { alert('Не удалось прочитать JSON.'); } }; r.readAsText(file); }
 function download(name, text) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
 
+// ---------- crosswords ----------
+const xwPacks = {}, xwWordMap = {}; let xwDaily = null, xwWarmed = false, xs = null;
+const isMet = (id) => { const p = store.progress[id]; return !!p && (p.correct + p.wrong) > 0; };
+const xwKey = (x, y) => x + ',' + y;
+const xwGroups = () => catalog.groups.filter(g => store.groups[g.id] && store.groups[g.id].enabled);
+const xwWord = (id) => { if (!xwWordMap[id]) for (const g of groupsData) for (const w of g.words) xwWordMap[w.id] = w; return xwWordMap[id]; };
+function getPacks(gid) { if (!xwPacks[gid]) { const gd = groupsData.find(g => g.id === gid); xwPacks[gid] = gd ? buildPacks(gd.words, { groupId: gid }) : []; } return xwPacks[gid]; }
+function xwDailyPuzzle() { const k = todayStr() + ':' + words.filter(w => isMet(w.id)).length; if (!xwDaily || xwDaily.k !== k) xwDaily = { k, p: dailyPuzzle(words, store.progress, todayStr()) }; return xwDaily.p; }
+function xwTotals() {
+  let open = 0, total = 0, done = 0;
+  for (const g of xwGroups()) { const d = (store.crosswords.packs[g.id] || {}).done || {}; for (const p of getPacks(g.id)) { total++; if (packUnlocked(p, isMet)) open++; if (d[p.n]) done++; } }
+  return { open, total, done };
+}
+function xwHomeText() {
+  const d = store.crosswords.daily, n = words.filter(w => isMet(w.id)).length;
+  const day = d && d.date === todayStr() ? (d.done ? 'кроссворд дня решён' : 'кроссворд дня начат') : n >= MIN_MET ? 'кроссворд дня готов' : `встретьте ещё слов: ${MIN_MET - n} для кроссворда дня`;
+  if (!xwGroups().every(g => xwPacks[g.id])) return day;
+  const t = xwTotals(); return `${day} · открыто ${t.open} из ${t.total}`;
+}
+function warmXw(i = 0) {
+  if (i >= catalog.groups.length) return;
+  getPacks(catalog.groups[i].id); $('#mc-xw').textContent = xwHomeText(); setTimeout(() => warmXw(i + 1), 0);
+}
+function renderXw() {
+  const d = store.crosswords.daily, today = d && d.date === todayStr(), p = today ? null : xwDailyPuzzle(), b = $('#xw-daily');
+  b.textContent = today ? (d.done ? 'Посмотреть' : 'Продолжить') : 'Начать'; b.disabled = !today && !p;
+  $('#xw-daily-state').textContent = today ? (d.done ? 'Решён сегодня. Следующий будет завтра.' : 'Начат, прогресс сохранён.') : p ? 'Готов: один кроссворд в день из слов, которые вы уже встречали.' : `Нужно встретить не меньше ${MIN_MET} слов – пройдите «Новые слова» или «Повторение».`;
+  $('#xw-groups').innerHTML = xwGroups().map(g => {
+    const rec = store.crosswords.packs[g.id] || { done: {}, current: null }, packs = getPacks(g.id);
+    const open = packs.filter(p => packUnlocked(p, isMet)).length, solved = packs.filter(p => rec.done[p.n]).length;
+    return `<div class="card"><b>${g.title}</b><p class="muted small">решено ${solved} · открыто ${open} из ${packs.length}</p><div class="xw-tiles">${packs.map(p => {
+      const dn = rec.done[p.n], cu = rec.current && rec.current.n === p.n, lk = !dn && !cu && !packUnlocked(p, isMet);
+      return `<button class="xw-tile ${dn ? 'done' : cu ? 'current open' : lk ? 'locked' : 'open'}" data-g="${g.id}" data-n="${p.n}" ${lk ? 'disabled' : ''}>${lk ? '🔒' : dn ? p.n + '✓' : p.n}</button>`;
+    }).join('')}</div></div>`;
+  }).join('');
+}
+function openXw(ref) {
+  const cw = store.crosswords, date = todayStr(); let play, done = false, title, note = '';
+  if (ref.kind === 'daily') {
+    title = 'Кроссворд дня'; const d = cw.daily;
+    if (d && d.date === date) { play = d.play; done = d.done; note = d.date; }
+    else { const p = xwDailyPuzzle(); if (!p) return; play = newPlay(p); }
+  } else {
+    const pack = getPacks(ref.groupId).find(p => p.n === ref.n), rec = cw.packs[ref.groupId] || (cw.packs[ref.groupId] = { done: {}, current: null });
+    title = `${catalog.groups.find(g => g.id === ref.groupId).title} · № ${ref.n}`;
+    if (rec.done[ref.n]) { done = true; note = rec.done[ref.n]; play = newPlay(pack); play.fill = { ...pack.cells }; }
+    else if (rec.current && rec.current.n === ref.n) play = rec.current.play;
+    else {
+      const c = rec.current;
+      if (c && Object.keys(c.play.fill).length && !confirm(`В этом легионе уже начат кроссворд № ${c.n}. Начать другой? Заполненное сотрётся.`)) return;
+      play = newPlay(pack); rec.current = { n: ref.n, play };
+    }
+  }
+  xs = { ref, play, done, title, note, date, ei: 0, cur: 0, wrong: new Set(), status: '', res: null };
+  const i = play.puzzle.entries.findIndex(e => !entryFilled(play, e));
+  xwSelect(i < 0 ? 0 : i); go('xwplay'); xwPaint();
+}
+const xwEntry = () => xs.play.puzzle.entries[xs.ei];
+const xwCell = () => entryCells(xwEntry())[xs.cur];
+function xwSelect(i, k) {
+  xs.ei = i; const cs = entryCells(xs.play.puzzle.entries[i]);
+  xs.cur = k != null ? k : Math.max(0, cs.findIndex(c => !(xwKey(c.x, c.y) in xs.play.fill)));
+}
+function xwPaint() {
+  const pz = xs.play.puzzle, e = xwEntry(), cc = xwCell(), act = new Set(entryCells(e).map(c => xwKey(c.x, c.y))), starts = {}, w = xwWord(e.id);
+  pz.entries.forEach(x => starts[xwKey(x.x, x.y)] = x.num);
+  let h = '';
+  for (let y = 0; y < GRID_H; y++) for (let x = 0; x < GRID_W; x++) {
+    const k = xwKey(x, y);
+    if (!(k in pz.cells)) { h += '<div class="xw-c off"></div>'; continue; }
+    const cls = [act.has(k) && 'act', cc.x === x && cc.y === y && !xs.done && 'cur', xs.play.revealed[k] && 'rev', xs.wrong.has(k) && 'wrong'].filter(Boolean).join(' ');
+    h += `<div class="xw-c ${cls}" data-x="${x}" data-y="${y}">${starts[k] ? `<s>${starts[k]}</s>` : ''}${xs.play.fill[k] || ''}</div>`;
+  }
+  $('#xw-grid').innerHTML = h; $('#xw-grid').style.gridTemplateColumns = `repeat(${GRID_W}, var(--xw-cell))`;
+  $('#xw-title').textContent = xs.title;
+  $('#xw-clue').innerHTML = `<b>${e.num} ${e.dir === 'a' ? '→' : '↓'}</b> ${w ? (POS[w.pos] || '') + ' · ' + w.ru.join('; ') : ''} · ${e.word.length} букв`;
+  const shown = xs.play.ctxWords && xs.play.ctxWords[e.id] && w && w.ex && w.ex[0];
+  $('#xw-ctx').innerHTML = shown ? clozeText(w) : ''; $('#xw-ctx').classList.toggle('hidden', !shown);
+  for (const id of ['cell', 'word', 'ctx']) $('#xw-hint-' + id).disabled = xs.done || (id === 'ctx' && !(w && w.ex && w.ex[0]));
+  $('#xw-status').textContent = xs.done ? (xs.note ? 'Решён ' + xs.note : 'Решён') : xs.status;
+  $('#xw-check').disabled = xs.done;
+  $('#xw-check').classList.toggle('pulse', !xs.done && Object.keys(xs.play.fill).length === Object.keys(pz.cells).length);
+  $('#xw-kb').classList.toggle('hidden', store.settings.xwKeyboard !== 'own' || xs.done);
+  $('#xw-result').classList.toggle('hidden', !xs.res);
+  if (xs.res) $('#xw-res-text').innerHTML = `<b>Решено!</b> ${xs.res.already ? 'уже засчитано' : '+' + xs.sc.xp + ' XP'} · подсказок: ${xs.sc.hints} · слов не открыто: ${xs.sc.cleanWords} из ${xs.sc.words}`;
+}
+function xwSave() {
+  const cw = store.crosswords, r = xs.ref;
+  if (r.kind === 'daily') cw.daily = { date: xs.date, play: xs.play, done: false };
+  else (cw.packs[r.groupId] || (cw.packs[r.groupId] = { done: {}, current: null })).current = { n: r.n, play: xs.play };
+  save();
+}
+function xwChanged() { xs.status = ''; xwSave(); xwPaint(); }
+function xwAdvance() { xs.cur = Math.min(xs.cur + 1, xwEntry().word.length - 1); }
+function xwFocusInput() {}
+function xwType(ch) {
+  if (!xs || xs.done) return;
+  const c = xwCell(); setLetter(xs.play, c.x, c.y, ch); xs.wrong.delete(xwKey(c.x, c.y)); xwAdvance(); xwChanged();
+}
+function xwBackspace() {
+  if (!xs || xs.done) return;
+  let c = xwCell(), k = xwKey(c.x, c.y);
+  if (!(k in xs.play.fill) || xs.play.revealed[k]) { if (xs.cur > 0) xs.cur--; c = xwCell(); k = xwKey(c.x, c.y); }
+  clearLetter(xs.play, c.x, c.y); xs.wrong.delete(k); xwChanged();
+}
+function xwTap(x, y) {
+  const es = xs.play.puzzle.entries, at = es.map((e, i) => i).filter(i => entryCells(es[i]).some(c => c.x === x && c.y === y));
+  if (!at.length) return;
+  const c = xwCell(), same = c.x === x && c.y === y;
+  const i = same && at.length > 1 ? at.find(j => j !== xs.ei) : at.includes(xs.ei) ? xs.ei : (at.find(j => es[j].dir === xwEntry().dir) ?? at[0]);
+  xwSelect(i, entryCells(es[i]).findIndex(c => c.x === x && c.y === y)); xwPaint(); xwFocusInput();
+}
+function xwStep(d) { const n = xs.play.puzzle.entries.length; xwSelect((xs.ei + d + n) % n); xwPaint(); xwFocusInput(); }
+function xwMove(dir, d) {
+  const es = xs.play.puzzle.entries;
+  if (xwEntry().dir === dir) xs.cur = Math.max(0, Math.min(xwEntry().word.length - 1, xs.cur + d));
+  else {
+    const c = xwCell(), at = (e) => entryCells(e).findIndex(q => q.x === c.x && q.y === c.y), j = es.findIndex(e => e.dir === dir && at(e) >= 0);
+    if (j < 0) return; xwSelect(j, at(es[j]));
+  }
+  xwPaint();
+}
+function xwHint(kind) {
+  if (!xs || xs.done) return;
+  const e = xwEntry(), c = xwCell(), p = xs.play;
+  if (kind === 'cell') { if (revealCell(p, c.x, c.y)) { xs.wrong.delete(xwKey(c.x, c.y)); xwAdvance(); } }
+  else if (kind === 'word') { if (revealWord(p, e)) entryCells(e).forEach(q => xs.wrong.delete(xwKey(q.x, q.y))); }
+  else { p.ctxWords = p.ctxWords || {}; if (!p.ctxWords[e.id]) { p.ctxWords[e.id] = true; noteHint(p); } }
+  xwChanged(); xwFocusInput();
+}
+function xwCheck() {
+  if (!xs || xs.done) return;
+  const r = checkPlay(xs.play); xs.wrong = new Set(r.wrong);
+  if (r.solved) {
+    xs.res = applySolved(store, xs.ref, xs.play, todayStr()); xs.sc = scorePlay(xs.play); xs.done = true; save();
+  } else xs.status = `неверных букв: ${r.wrong.length}, пустых клеток: ${r.empty}`;
+  xwPaint();
+}
+function wireXw() {
+  $('#btn-xw').onclick = () => go('xw'); $('#xw-back').onclick = () => go('xw');
+  $('#xw-daily').onclick = () => openXw({ kind: 'daily' });
+  $('#xw-groups').onclick = (e) => { const t = e.target.closest('.xw-tile'); if (t && !t.disabled) openXw({ kind: 'pack', groupId: t.dataset.g, n: +t.dataset.n }); };
+  $('#xw-grid').onclick = (e) => { const c = e.target.closest('.xw-c'); if (c && c.dataset.x != null && xs && !xs.done) xwTap(+c.dataset.x, +c.dataset.y); };
+  $('#xw-prev').onclick = () => xwStep(-1); $('#xw-next').onclick = () => xwStep(1);
+  $('#xw-hint-cell').onclick = () => xwHint('cell'); $('#xw-hint-word').onclick = () => xwHint('word'); $('#xw-hint-ctx').onclick = () => xwHint('ctx');
+  $('#xw-check').onclick = xwCheck;
+  $('#xw-kb').innerHTML = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'].map((r, i) => `<div>${[...r].map(c => `<button data-k="${c}">${c}</button>`).join('')}${i === 2 ? '<button class="xw-bs" data-k="bs">⌫</button>' : ''}</div>`).join('');
+  $('#xw-kb').onmousedown = (e) => e.preventDefault();
+  $('#xw-kb').onclick = (e) => { const k = e.target.dataset.k; if (k === 'bs') xwBackspace(); else if (k) xwType(k); };
+  document.addEventListener('keydown', (e) => {
+    if ($('#screen-xwplay').classList.contains('hidden') || !xs || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key, arrows = { ArrowRight: ['a', 1], ArrowLeft: ['a', -1], ArrowDown: ['d', 1], ArrowUp: ['d', -1] };
+    if (/^[a-zA-Z]$/.test(k)) xwType(k); else if (k === 'Backspace') xwBackspace(); else if (k === 'Enter') xwCheck();
+    else if (k === 'Tab') xwStep(e.shiftKey ? -1 : 1); else if (arrows[k] && !xs.done) xwMove(...arrows[k]); else return;
+    e.preventDefault();
+  });
+}
+
 // ---------- wiring ----------
 function wire() {
   document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
@@ -325,7 +489,7 @@ function wire() {
     if (/^[1-4]$/.test(e.key)) { const b = document.querySelectorAll('.opt')[+e.key - 1]; if (b) b.click(); }
     else if (e.key === '0') $('#btn-dk').click();
   });
-  bindSettings();
+  bindSettings(); wireXw();
   if (window.speechSynthesis) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 }
