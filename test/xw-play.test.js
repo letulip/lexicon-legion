@@ -56,3 +56,17 @@ test('applySolved: XP and streak once; levels and trouble untouched', () => {
   assert.equal(applySolved(store, { kind: 'pack', groupId: 'g', n: 2 }, p, '2026-11-14').already, true);
   assert.equal(JSON.stringify(store.progress), before);
 });
+
+test('applySolved: a daily is filed under the date it was made for; a pack under its content key', () => {
+  const store = defaultStore(); const p = newPlay(puzzle, 1); fillAll(p);
+  // opened on the 13th, finished at 00:05 on the 14th: yesterday's crossword is done, today's is still free
+  assert.equal(applySolved(store, { kind: 'daily', date: '2026-11-13' }, p, '2026-11-14').already, false);
+  assert.equal(store.crosswords.daily.date, '2026-11-13'); assert.equal(store.stats.lastStudyDate, '2026-11-14');
+  assert.equal(applySolved(store, { kind: 'daily', date: '2026-11-14' }, p, '2026-11-14').already, false);
+  // done marks follow the key, not the number: a different puzzle at the same number is not marked
+  store.crosswords.packs.g = { done: {}, current: { n: 50, key: '50-old', play: p } };
+  applySolved(store, { kind: 'pack', groupId: 'g', n: 50, key: '50-old' }, p, '2026-11-14');
+  assert.equal(store.crosswords.packs.g.done['50-old'], '2026-11-14'); assert.equal(store.crosswords.packs.g.done['50-new'], undefined);
+  assert.equal(store.crosswords.packs.g.current, null);
+  assert.equal(applySolved(store, { kind: 'pack', groupId: 'g', n: 50, key: '50-new' }, p, '2026-11-15').already, false);
+});

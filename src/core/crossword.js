@@ -171,6 +171,12 @@ export function validate(p) {
 // Pack queue: next `window` unused words -> puzzle; placed words leave, the rest roll over to the next puzzle.
 // maxSkips is only a safety valve against a word that can never be placed: dropping after 3 skips capped
 // coverage at 69 % of a group (measured), 12 gives ~97 %.
+// Content identity of a pack. Done marks are stored under it, so if the puzzle at number n ever changes
+// (words appended to the group shift the last few packs; a GEN_VERSION bump shifts all) an old ✓ never
+// lands on a puzzle the user has not seen.
+const hashStr = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); };
+export const packKey = (n, entries) => n + '-' + hashStr(entries.map(e => e.id + ':' + e.x + ',' + e.y + e.dir).join('|'));
+
 export function buildPacks(groupWords, { groupId, w = GRID_W, h = GRID_H, window = 24, maxSkips = 12, tries = 12 } = {}) {
   const queue = groupWords.filter(x => eligible(x, Math.max(w, h))).map(x => ({ x, skips: 0 }));
   const packs = [];
@@ -182,7 +188,7 @@ export function buildPacks(groupWords, { groupId, w = GRID_W, h = GRID_H, window
     const used = new Set(ok ? puz.entries.map(e => e.id) : []);
     const back = batch.filter(b => !used.has(b.x.id)).map(b => ({ x: b.x, skips: b.skips + 1 })).filter(b => b.skips < maxSkips);
     queue.unshift(...back);
-    if (ok) packs.push({ n, ...puz, wordIds: puz.entries.map(e => e.id) });
+    if (ok) packs.push({ n, key: packKey(n, puz.entries), ...puz, wordIds: puz.entries.map(e => e.id) });
   }
   return packs;
 }

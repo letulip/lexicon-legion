@@ -50,18 +50,22 @@ export function scorePlay(play) {
   const clean = play.puzzle.entries.filter(e => !play.revealedWords[e.id]).length;
   return { words: play.puzzle.entries.length, cleanWords: clean, hints: play.hints, xp: clean * XP_PER_WORD + (play.hints ? 0 : XP_NO_HINTS) };
 }
-// Record a solved crossword in the store: XP, streak, done marks. ref = { kind: 'daily' } | { kind: 'pack', groupId, n }.
+// Record a solved crossword in the store: XP, streak, done marks.
+// ref = { kind: 'daily', date? } | { kind: 'pack', groupId, n, key? }. A daily is filed under the date it was made
+// for (a puzzle opened before midnight and finished after it must not eat the next day's crossword); a pack under
+// its content key. XP and the streak day belong to `today`, when the solving happened.
 // Idempotent: solving the same crossword twice pays once. Returns { xp, already }.
 export function applySolved(store, ref, play, today) {
   const cw = store.crosswords;
   if (ref.kind === 'daily') {
-    if (cw.daily && cw.daily.date === today && cw.daily.done) return { xp: 0, already: true };
-    cw.daily = { date: today, play, done: true };
+    const date = ref.date || today;
+    if (cw.daily && cw.daily.date === date && cw.daily.done) return { xp: 0, already: true };
+    cw.daily = { date, play, done: true };
   } else {
-    const g = cw.packs[ref.groupId] || (cw.packs[ref.groupId] = { done: {}, current: null });
-    if (g.done[ref.n]) return { xp: 0, already: true };
-    g.done[ref.n] = today;
-    if (g.current && g.current.n === ref.n) g.current = null;
+    const g = cw.packs[ref.groupId] || (cw.packs[ref.groupId] = { done: {}, current: null }), k = ref.key || ref.n;
+    if (g.done[k]) return { xp: 0, already: true };
+    g.done[k] = today;
+    if (g.current && (g.current.key || g.current.n) === k) g.current = null;
   }
   const { xp } = scorePlay(play), st = store.stats;
   st.xp += xp; st.xwSolved = (st.xwSolved || 0) + 1;

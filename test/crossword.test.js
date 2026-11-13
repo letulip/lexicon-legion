@@ -109,3 +109,19 @@ test('daily picking favours low-level words', () => {
   for (let s = 0; s < 50; s++) for (const x of pickDailyWords([...low, ...high], pr, { seed: 'd' + s, now: NOW, count: 20 })) lowIds.has(x.id) ? lo++ : hi++;
   assert.ok(lo > hi * 1.5, `low ${lo} vs high ${hi}`);
 });
+
+test('pack keys: unique, deterministic, and stable for early packs when words are appended to the group', () => {
+  const base = GROUPS['cestus-d'], packs = buildPacks(base, { groupId: 'cestus-d' });
+  assert.equal(new Set(packs.map(p => p.key)).size, packs.length);
+  assert.deepEqual(buildPacks(base, { groupId: 'cestus-d' }).map(p => p.key), packs.map(p => p.key));
+  // the owner appends words to the end of a group: every pack whose window never reached the old tail keeps its key,
+  // and a pack whose content did change gets a NEW key (so an old ✓ cannot land on an unseen puzzle)
+  const extra = GROUPS['common-d'].slice(0, 120).map(w => ({ ...w, id: 'x-' + w.id }));
+  const grown = buildPacks([...base, ...extra], { groupId: 'cestus-d' });
+  const same = packs.filter((p, i) => grown[i] && grown[i].key === p.key).length;
+  assert.ok(same >= packs.length - 6, `only ${same} of ${packs.length} packs kept their key`);
+  for (let i = 0; i < packs.length; i++) {
+    const a = packs[i], b = grown[i];
+    assert.equal(a.key === b.key, JSON.stringify(a.entries) === JSON.stringify(b.entries), 'key must change exactly when the puzzle changes, pack ' + a.n);
+  }
+});
