@@ -29,3 +29,14 @@ test('migrate v1 → v2 keeps assessment-seeded known words known (one stamped c
   const s = migrate(old);
   assert.equal(s.progress.ledge.correct, 1); assert.equal(s.progress.slum.correct, 0);
 });
+
+test('migrate v2 → v3 adds the crosswords section and keyboard setting, keeps everything else', () => {
+  const old = { schemaVersion: 2, progress: { ledge: { lvl: 5, due: 9, peak: 5, correct: 6, wrong: 1, lastSeen: 3 } }, stats: { xp: 420, dayStreak: 4 }, settings: { dailyNew: 15, reviewSize: 30, learnBatch: 5 }, groups: { 'cestus-d': { enabled: false } } };
+  const s = migrate(JSON.parse(JSON.stringify(old)));
+  assert.equal(s.schemaVersion, SCHEMA_VERSION);
+  assert.deepEqual(s.crosswords, { daily: null, packs: {} }); assert.equal(s.settings.xwKeyboard, 'system');
+  assert.deepEqual(s.progress.ledge, old.progress.ledge); assert.equal(s.stats.xp, 420); assert.equal(s.settings.reviewSize, 30); assert.equal(s.groups['cestus-d'].enabled, false);
+  // an existing crosswords section is never overwritten
+  const keep = migrate({ schemaVersion: 3, progress: {}, stats: {}, crosswords: { daily: { date: '2026-11-13', done: true }, packs: { g: { done: { 1: '2026-11-12' }, current: null } } } });
+  assert.equal(keep.crosswords.daily.done, true); assert.equal(keep.crosswords.packs.g.done[1], '2026-11-12');
+});

@@ -1,6 +1,6 @@
 // Store shape, defaults and backward-compatible migrations. Pure — no localStorage here.
 // Cardinal rule: a migration never drops the user's data. Tested in test/store-migrate.test.js.
-export const SCHEMA_VERSION = 2;   // bump + add a migration step when the shape changes
+export const SCHEMA_VERSION = 3;   // bump + add a migration step when the shape changes
 
 export function defaultStore() {
   return {
@@ -8,12 +8,14 @@ export function defaultStore() {
     progress: {},   // wordId -> { lvl, due, peak, correct, wrong, lastSeen, src }
     groups: {},     // groupId -> { enabled, addedAt, triage: { pos, done } }
     custom: {},     // wordId -> { w, pos, ru:[], ex:[] }  ("мои слова")
+    // crosswords: daily = { date, play, done } | null; packs[groupId] = { done: { [n]: date }, current: { n, play } | null }
+    crosswords: { daily: null, packs: {} },
     stats: {
       xp: 0, dayStreak: 0, bestStreak: 0, lastStudyDate: null, freezes: 1,
       totalAnswers: 0, totalCorrect: 0, history: {},          // date -> answers
       newToday: { date: null, n: 0 },
     },
-    settings: { dailyNew: 10, learnBatch: 10, reviewSize: 20, voiceURI: '', accent: 'en-US', rate: 1, sound: true, dark: 'auto' },
+    settings: { dailyNew: 10, learnBatch: 10, reviewSize: 20, voiceURI: '', accent: 'en-US', rate: 1, sound: true, dark: 'auto', xwKeyboard: 'system' },
     flags: { onboarded: false, assessImported: false },
   };
 }
@@ -43,6 +45,7 @@ export function migrate(s) {
     // progress as "new", so stamp one correct answer to keep them in the review schedule.
     for (const id in s.progress || {}) { const p = s.progress[id]; if (p && p.lvl >= 3 && !(p.correct + p.wrong)) p.correct = 1; }
   }
+  // v2 -> v3: crosswords section + settings.xwKeyboard. Purely additive: fillDefaults below adds them.
   s = fillDefaults(s, defaultStore());
   s.schemaVersion = SCHEMA_VERSION;
   return s;
